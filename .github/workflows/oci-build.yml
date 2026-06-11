@@ -1,0 +1,114 @@
+# OCI build & publish for aivcs-human-in-the-loop.
+#
+# Triggers:
+#   - push to `develop`  -> tags: develop, sha-<short>
+#   - push to tag `v*`   -> tags: <semver>, latest, sha-<short>
+#
+# Auth:
+#   - GHCR via GITHUB_TOKEN (packages: write).
+#   - id-token: write is reserved for keyless cosign signing in a follow-up
+#     PR (see dockworker.toml [oci.signing]).
+#
+# Build model:
+#   - dockworker.toml is the canonical OCI manifest. There is intentionally
+#     NO Dockerfile — per lornu-ai org standard, OCI builds for web apps
+#     are dockworker-only.
+#   - This workflow shells out to `dockworker build` to materialize the
+#     image from dockworker.toml, then `dockworker push` to GHCR. The
+#     `dockworker` CLI is installed from the dockworker.ai release feed.
+#   - docker buildx is still set up for QEMU + multi-arch emulation that
+#     dockworker delegates to under the hood.
+#
+# All third-party actions are pinned to a commit SHA. Bump deliberately.
+
+name: oci-build
+
+on:
+  push:
+    branches: [develop]
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: oci-build-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+  # Reserved for keyless cosign signing in a follow-up PR.
+  id-token: write
+  attestations: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: stevedores-org/aivcs-human-in-the-loop
+  # Pin the dockworker CLI version. Bump deliberately in a dep-update PR.
+  DOCKWORKER_VERSION: "0.4.0"
+
+jobs:
+  build:
+    name: build & push multi-arch
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf # v3.2.0
+        with:
+          platforms: linux/amd64,linux/arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349 # v3.7.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tags
+        id: meta
+        uses: docker/metadata-action@369eb591f429131d6889c46b94e711f089e6ca96 # v5.6.1
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Install dockworker CLI
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://dockworker.ai/install.sh" \
+            | DOCKWORKER_VERSION="${DOCKWORKER_VERSION}" sh
+          dockworker --version
+
+      - name: dockworker build (multi-arch)
+        env:
+          DOCKWORKER_TAGS: ${{ steps.meta.outputs.tags }}
+          DOCKWORKER_CACHE_SCOPE: oci-multi
+        run: |
+          set -euo pipefail
+          dockworker build \
+            --config dockworker.toml \
+            --platform linux/amd64,linux/arm64 \
+            --tag-list "${DOCKWORKER_TAGS}" \
+            --cache-from "type=gha,scope=${DOCKWORKER_CACHE_SCOPE}" \
+            --cache-to   "type=gha,mode=max,scope=${DOCKWORKER_CACHE_SCOPE}" \
+            --provenance \
+            --sbom
+
+      - name: dockworker push (multi-arch)
+        env:
+          DOCKWORKER_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          dockworker push \
+            --config dockworker.toml \
+            --tag-list "${DOCKWORKER_TAGS}"

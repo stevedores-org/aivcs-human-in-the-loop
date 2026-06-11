@@ -1,0 +1,42 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: aivcs-hitl-prod
+
+resources:
+  - ../../base
+
+images:
+  - name: ghcr.io/stevedores-org/aivcs-human-in-the-loop
+    # prod tracks immutable semver tags via Flux image automation;
+    # the placeholder here is replaced by the image-update controller.
+    newTag: latest
+
+configMapGenerator:
+  - name: aivcs-hitl-config
+    literals:
+      - AIVCS_API_URL=https://aivcs-api.lornu.ai
+      - SSO_ISSUER=https://auth.lornu.ai
+
+patches:
+  - path: httproute-patch.yaml
+    target:
+      group: gateway.networking.k8s.io
+      version: v1
+      kind: HTTPRoute
+      name: aivcs-human-in-the-loop
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: aivcs-human-in-the-loop
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 3
+
+labels:
+  - includeSelectors: false
+    pairs:
+      app.kubernetes.io/instance: aivcs-hitl-prod
+      lornu.ai/env: prod
