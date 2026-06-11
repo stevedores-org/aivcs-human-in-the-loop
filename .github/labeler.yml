@@ -1,0 +1,18 @@
+# Configuration for actions/labeler
+
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: 'src/**/*'
+      - any-glob-to-any-file: 'index.html'
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: '.github/**/*'
+      - any-glob-to-any-file: '.local-ci.toml'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file: 'docs/**/*'
+      - any-glob-to-any-file: 'AGENTS.md'
+      - any-glob-to-any-file: 'CLAUDE.md'
+      - any-glob-to-any-file: 'README.md'

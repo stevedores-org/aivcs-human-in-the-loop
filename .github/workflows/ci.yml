@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+jobs:
+  local-ci:
+    name: Local CI Runner
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Install Gitleaks
+        run: |
+          wget https://github.com/gitleaks/gitleaks/releases/download/v8.18.2/gitleaks_8.18.2_linux_x64.tar.gz
+          tar -zxvf gitleaks_8.18.2_linux_x64.tar.gz
+          sudo mv gitleaks /usr/local/bin/
+
+      - name: Install local-ci
+        run: go install github.com/stevedores-org/local-ci@latest
+
+      - name: Run local-ci
+        run: $(go env GOPATH)/bin/local-ci

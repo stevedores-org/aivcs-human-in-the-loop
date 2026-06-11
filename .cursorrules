@@ -1,0 +1,8 @@
+# AIVCS Cursor Rules
+
+## Mandatory Guidelines
+1. **Validation**: Run `local-ci` before pushing any branch. Keep stages passing.
+2. **Commit Messages**: Strictly follow Conventional Commits. Do not use emojis in commit messages.
+3. **Runtime**: Use Bun for all package management and running scripts (`bun install`, `bun test`, `bun run build`). Do not use npm, yarn, or pnpm.
+4. **Style**: Use TypeScript for components and logic. Use Vanilla CSS for custom styles. Avoid adding Tailwind utilities inline unless matching current patterns.
+5. **Quality**: Ensure all file paths and symbols mentioned in communications are linked in Markdown format using the `file://` scheme.

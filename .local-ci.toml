@@ -1,0 +1,30 @@
+# local-ci configuration for AIVCS (TypeScript/Bun)
+
+[cache]
+skip_dirs = [".git", "node_modules", "dist", ".next", "coverage", ".claude", "docs/design"]
+include_patterns = ["*.ts", "*.tsx", "*.js", "*.jsx", "*.json", "package.json", "tsconfig.json"]
+
+[stages.typecheck]
+command = ["bun", "run", "tsc", "--noEmit"]
+timeout = 120
+enabled = true
+
+[stages.lint]
+command = ["bun", "run", "eslint", "."]
+timeout = 300
+enabled = true
+
+[stages.test]
+command = ["bun", "test"]
+timeout = 600
+enabled = true
+
+[stages.build]
+command = ["bun", "run", "build"]
+timeout = 300
+enabled = true
+
+[stages.gitleaks]
+command = ["gitleaks", "detect", "--verbose", "--no-git"]
+timeout = 120
+enabled = true

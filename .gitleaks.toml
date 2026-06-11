@@ -1,0 +1,12 @@
+# Gitleaks Configuration for AIVCS
+title = "AIVCS Gitleaks Configuration"
+
+[allowlist]
+description = "Allowlist for false positives and design reference assets"
+paths = [
+  '''docs/design/aivcs-mockup\.png''',
+  '''.*\.png$''',
+  '''bun\.lockb''',
+  '''node_modules/.*''',
+  '''dist/.*'''
+]
