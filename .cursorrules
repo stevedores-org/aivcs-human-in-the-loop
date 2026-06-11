@@ -1,0 +1,23 @@
+# Cursor rules — stevedores-org/aivcs-human-in-the-loop
+
+Read `AGENTS.md` for the canonical contract. The rules below are the
+operational subset for Cursor:
+
+- aivcs human-in-the-loop UI. Stack: TypeScript + React + Vite, runtime is
+  Bun. No npm / pnpm / yarn / node. Lockfile is `bun.lockb`.
+- PR base is `develop`. Never `main`.
+- No secrets in git. Use ESO + GCP Secret Manager. References only.
+  `.gitleaks.toml` enforces it.
+- No `Dockerfile`. OCI images come from `dockworker.ai` (Step C / #6).
+- No Helm. Kubernetes workload delivery is Kustomize overlays under
+  `k8s/{base,overlays/dev,overlays/prod}` (Step C / #6).
+- Pre-push: run `local-ci` (fallback:
+  `bun run tsc --noEmit && bun run eslint . && bun test && bun run build`).
+  If red, do not push.
+- Conventional-Commits PR titles only. Allowed types: `feat`, `fix`,
+  `chore`, `docs`, `refactor`, `test`, `perf`, `ci`, `build`, `revert`.
+- High-blast actions (force-push to `develop` / `main`, branch-protection
+  bootstrap, direct cloud-API mutation): ask before applying.
+- No emojis. No comments explaining what the code does — explain *why*
+  when a value is non-obvious (deliberate pin, workaround, hidden
+  invariant).
