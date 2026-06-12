@@ -8,9 +8,9 @@
 #   - push to `develop`  -> tags: develop, sha-<short>
 #   - push to tag `v*`   -> tags: <semver>, latest, sha-<short>
 #
-# Required repo secrets:
-#   - GCP_WORKLOAD_IDENTITY_PROVIDER
-#   - GCP_SERVICE_ACCOUNT
+# Required repo secrets (synced from GCP Secret Manager in gcp-lornu-ai):
+#   - GCP_WIF_PROVIDER
+#   - GCP_WIF_SERVICE_ACCOUNT
 
 name: oci-build
 
@@ -104,8 +104,8 @@ jobs:
         id: auth
         uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
         with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_WIF_SERVICE_ACCOUNT }}
           token_format: access_token
           access_token_lifetime: 1800s
 
