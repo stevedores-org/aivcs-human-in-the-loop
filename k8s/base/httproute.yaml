@@ -10,7 +10,7 @@ spec:
   parentRefs:
     - name: shared-tls-gateway
       namespace: gateway-system
-      sectionName: https
+      sectionName: https-lornu-ai-wildcard
   # Hostnames are set per overlay (dev / prod) via JSON-patch.
   # The base manifest carries a placeholder that overlays MUST override;
   # `placeholder.invalid.` is reserved per RFC 6761 and will never resolve.
