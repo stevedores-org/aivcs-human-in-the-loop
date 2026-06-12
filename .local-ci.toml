@@ -17,33 +17,38 @@ optional = ["bun", "actionlint", "yamllint", "shellcheck"]
 
 [stages.typecheck]
 # tsc via Bun. Runs from package.json `tsc` devDep once Step A (#4) lands.
-command = ["bun", "run", "tsc", "--noEmit"]
+cmd = ["bun", "run", "tsc", "--noEmit"]
 timeout = 180
+enabled = true
 watch = ["**/*.ts", "**/*.tsx", "tsconfig*.json", "package.json"]
 
 [stages.lint]
-# ESLint via Bun. Config lands in Step A (#4).
-command = ["bun", "run", "eslint", "."]
+# ESLint via Bun. Forward-compatible shell wrapper matching CI.
+cmd = ["sh", "-c", 'if grep -q "\"eslint\"" package.json || ls eslint.config.* .eslintrc.* >/dev/null 2>&1; then bun run eslint .; else echo "skip: eslint not configured yet"; fi']
 depends_on = ["typecheck"]
 timeout = 120
+enabled = true
 watch = ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "eslint.config.*", ".eslintrc.*", "package.json"]
 
 [stages.test]
-# Bun's built-in test runner. Unit tests land alongside Step A (#4).
-command = ["bun", "test"]
+# Bun's built-in test runner. Forward-compatible shell wrapper matching CI.
+cmd = ["sh", "-c", 'if find . -path ./node_modules -prune -o \( -name "*.test.*" -o -name "*.spec.*" -o -name "*_test_*" -o -name "*_spec_*" \) -print -quit | grep -q .; then bun test; else echo "skip: no test files yet"; fi']
 depends_on = ["typecheck"]
 timeout = 300
+enabled = true
 watch = ["**/*.ts", "**/*.tsx", "**/*.test.*", "**/*.spec.*", "package.json"]
 
 [stages.build]
 # Vite production build via Bun. `vite build` script lands in Step A (#4).
-command = ["bun", "run", "build"]
+cmd = ["bun", "run", "build"]
 depends_on = ["typecheck", "lint"]
 timeout = 300
+enabled = true
 watch = ["**/*.ts", "**/*.tsx", "**/*.css", "**/*.html", "vite.config.*", "tsconfig*.json", "package.json", "index.html"]
 
 [stages.gitleaks]
 # Pinned via .github/workflows/ci.yml; local users get whatever is on PATH.
 # `--no-banner --redact` keeps the output noise-free and the redactor on.
-command = ["gitleaks", "detect", "--no-banner", "--redact"]
+cmd = ["gitleaks", "detect", "--no-banner", "--redact"]
 timeout = 60
+enabled = true
