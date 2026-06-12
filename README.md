@@ -89,7 +89,9 @@ k8s/
       httproute-patch.yaml  # hostname: aivcs-hitl.lornu.ai
 ```
 
-Runtime secrets (session signing, API tokens) will land via External Secrets Operator in a follow-up once upstream keys exist in `lornu-secrets`.
+Runtime secrets (session signing, API tokens) will land via External Secrets Operator in a follow-up once upstream keys exist in `gcp-secret-manager` (ClusterSecretStore `gcp-secret-manager` on GKE).
+
+Flux deploy manifests for `lornu-gke-prod` live in [lornu-ai/lornu.ai](https://github.com/lornu-ai/lornu.ai/tree/develop/crossplane/gcp/hub/spoke/apps/aivcs-hitl).
 
 ### Env var sources
 
