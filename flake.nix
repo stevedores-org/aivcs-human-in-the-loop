@@ -40,26 +40,30 @@
 
         packages = {
           # dockworker.ai OCI output (`oci.nix_output` in dockworker.toml).
-          # Frontend assets come from the dockworker build phase in CI, then
-          # are copied into the image here (sandbox-safe, no Dockerfile).
+          # CI runs `bun run build` (React + Vite → dist/) then Nix packages
+          # the static bundle with Caddy — same pattern as inertsynergies.com.
           oci = pkgs.dockerTools.buildLayeredImage {
             name = "aivcs-human-in-the-loop";
             tag = "latest";
             maxLayers = 50;
             contents = with pkgs; [
-              bun
+              caddy
               cacert
             ];
             extraCommands = ''
-              mkdir -p app/dist app/scripts tmp
+              mkdir -p srv etc/caddy tmp
               chmod 1777 tmp
-              cp -r ${distPath}/. app/dist/
-              cp ${./scripts/serve-dist.ts} app/scripts/serve-dist.ts
+              cp -R ${distPath}/. srv/
+              cp ${./Caddyfile} etc/caddy/Caddyfile
             '';
             config = {
-              Cmd = [ "${pkgs.bun}/bin/bun" "run" "/app/scripts/serve-dist.ts" ];
+              Cmd = [ "${pkgs.caddy}/bin/caddy" "run" "--config" "/etc/caddy/Caddyfile" ];
               User = "65532:65532";
-              WorkingDir = "/app";
+              WorkingDir = "/srv";
+              Env = [
+                "XDG_DATA_HOME=/tmp"
+                "XDG_CONFIG_HOME=/tmp"
+              ];
               ExposedPorts = {
                 "3000/tcp" = { };
               };
@@ -72,7 +76,7 @@
                 "org.opencontainers.image.licenses" = "Apache-2.0";
                 "lornu.ai/component" = "aivcs-human-in-the-loop";
                 "lornu.ai/managed-by" = "dockworker";
-                "lornu.ai/runtime" = "bun";
+                "lornu.ai/runtime" = "caddy";
                 "lornu.ai/kind" = "frontend-spa";
               };
             };
@@ -85,6 +89,7 @@
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             bun
+            caddy
             nodejs_22
             skopeo
           ];

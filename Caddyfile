@@ -1,0 +1,16 @@
+# Production static server for the Vite-built React SPA (see `bun run build`).
+# Same pattern as lornu-ai/inertsynergies.com — serves /assets/* with correct
+# MIME types; only unknown navigation paths fall back to index.html.
+{
+	admin off
+	auto_https off
+}
+
+:3000 {
+	root * /srv
+	encode gzip zstd
+	try_files {path} /index.html
+	file_server
+	header @assets Cache-Control "public, max-age=31536000, immutable"
+	@assets path /assets/*
+}

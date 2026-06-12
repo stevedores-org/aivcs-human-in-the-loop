@@ -120,6 +120,13 @@ jobs:
           set -euo pipefail
           ${{ steps.manifest.outputs.install_cmd }}
           ${{ steps.manifest.outputs.build_cmd }}
+          # Fail fast if Vite did not produce a production bundle (dev index.html
+          # references /src/main.tsx and breaks in the browser with MIME errors).
+          test -f dist/index.html
+          grep -q '/assets/' dist/index.html
+          ! grep -q '/src/main' dist/index.html
+          test -n "$(find dist/assets -name '*.js' -print -quit)"
+          echo "Vite production bundle OK ($(find dist/assets -name '*.js' | wc -l) JS chunks)"
 
       - name: Build OCI image (dockworker + nix)
         env:
