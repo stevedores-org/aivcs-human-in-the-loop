@@ -31,7 +31,7 @@ Tracker: [#2](https://github.com/stevedores-org/aivcs-human-in-the-loop/issues/2
 
 - **Frontend:** Vite + React 18 + TypeScript + Tailwind 4 + shadcn/ui (Radix primitives)
 - **Runtime:** Bun (>= 1.1)
-- **Build:** Vite → OCI image via [`dockworker.toml`](./dockworker.toml) (materialized in CI with docker buildx; no committed `Dockerfile`)
+- **Build:** Vite → OCI image via `flake.nix` + `skopeo` (no Dockerfile, no Docker daemon)
 - **Deploy:** Kubernetes via Kustomize + Flux + Gateway API (Lornu standard; no Helm)
 
 ## Local dev
@@ -57,10 +57,12 @@ PRs base on `develop`. See [AGENTS.md](./AGENTS.md).
 
 OCI images are built and pushed by `.github/workflows/oci-build.yml`:
 
-- push to `develop` → `ghcr.io/stevedores-org/aivcs-human-in-the-loop:develop`
-- push to tag `v*`  → `ghcr.io/stevedores-org/aivcs-human-in-the-loop:<semver>` + `latest`
+- `nix build .#oci` produces an OCI tarball
+- `skopeo copy` pushes to Google Artifact Registry (GAR)
+- push to `develop` → `us-central1-docker.pkg.dev/gcp-lornu-ai/lornu/aivcs-human-in-the-loop:develop`
+- push to tag `v*`  → same repo with semver + `latest`
 
-Multi-arch: `linux/amd64`, `linux/arm64`. Build spec in [`dockworker.toml`](./dockworker.toml); CI materializes it with docker buildx (debian-based `oven/bun` builder — alpine breaks Tailwind's native bindings).
+Build manifest: [`dockworker.toml`](./dockworker.toml). Nix derivation: [`flake.nix`](./flake.nix).
 
 ### k8s layout
 
