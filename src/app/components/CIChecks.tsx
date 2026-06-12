@@ -50,8 +50,8 @@ export function CIChecks() {
           <span style={{ fontSize: "11px", fontWeight: 600 }} className="text-foreground">Recent Activity</span>
         </div>
         <div className="flex-1 overflow-y-auto p-2 space-y-2">
-          {recentActivity.map((item, i) => (
-            <div key={i} className="flex items-center gap-2">
+          {recentActivity.map((item) => (
+            <div key={`${item.user}-${item.action}-${item.time}`} className="flex items-center gap-2">
               <div
                 className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
                 style={{ backgroundColor: item.color + "25", border: `1px solid ${item.color}40` }}

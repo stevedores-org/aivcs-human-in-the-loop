@@ -28,8 +28,8 @@ export function AuditTrail() {
         <div className="relative">
           <div className="absolute left-[5px] top-2 bottom-2 w-px bg-border" />
           <div className="space-y-1">
-            {auditEvents.map((evt, i) => (
-              <div key={i} className="flex items-start gap-2 pl-1 group">
+            {auditEvents.map((evt) => (
+              <div key={`${evt.time}-${evt.actor}-${evt.action}`} className="flex items-start gap-2 pl-1 group">
                 <div
                   className="w-2.5 h-2.5 rounded-full shrink-0 mt-1 z-10 border border-card"
                   style={{ backgroundColor: statusColor[evt.status] }}

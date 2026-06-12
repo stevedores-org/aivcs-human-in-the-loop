@@ -23,7 +23,11 @@ export function TopBar() {
       </button>
 
       {/* Notifications */}
-      <button className="relative p-1.5 text-muted-foreground hover:text-foreground transition-colors">
+      <button
+        type="button"
+        aria-label="Notifications"
+        className="relative p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+      >
         <Bell size={15} />
         <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-primary border border-card" />
       </button>

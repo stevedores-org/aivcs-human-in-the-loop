@@ -49,15 +49,19 @@ export function AgentIntentPanel() {
           <Bot size={13} className="text-primary" />
           <span style={{ fontSize: "12px", fontWeight: 600 }} className="text-foreground">Agent Intent</span>
         </div>
-        <button className="text-muted-foreground hover:text-foreground transition-colors">
+        <button
+          type="button"
+          aria-label="Open intent thread in full view"
+          className="text-muted-foreground hover:text-foreground transition-colors"
+        >
           <ExternalLink size={11} />
         </button>
       </div>
 
       {/* Comments thread */}
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
-        {agentComments.map((comment, i) => (
-          <div key={i} className="flex gap-2">
+        {agentComments.map((comment) => (
+          <div key={`${comment.agent}-${comment.time}`} className="flex gap-2">
             <div
               className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5"
               style={{ backgroundColor: comment.color + "25", border: `1px solid ${comment.color}40` }}
@@ -92,8 +96,8 @@ export function AgentIntentPanel() {
           <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
           <span style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }} className="text-muted-foreground">Agent Guidance</span>
         </div>
-        {guidance.map((item, i) => (
-          <div key={i} className="flex items-start gap-1.5 py-0.5 group cursor-pointer">
+        {guidance.map((item) => (
+          <div key={item} className="flex items-start gap-1.5 py-0.5 group cursor-pointer">
             <ChevronRight size={10} className="text-muted-foreground mt-0.5 group-hover:text-primary transition-colors shrink-0" />
             <span style={{ fontSize: "11px" }} className="text-muted-foreground group-hover:text-foreground transition-colors">{item}</span>
           </div>

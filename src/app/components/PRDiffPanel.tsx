@@ -63,7 +63,7 @@ export function PRDiffPanel() {
       <div className="flex-1 overflow-y-auto" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "11px" }}>
         {diffLines.map((line, i) => (
           <div
-            key={i}
+            key={`${i}-${line.lineOld}-${line.lineNew}`}
             className={`flex items-start ${
               line.type === "removed"
                 ? "bg-red-500/10 border-l-2 border-red-500/60"
