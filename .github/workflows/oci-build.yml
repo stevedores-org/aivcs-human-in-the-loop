@@ -4,20 +4,13 @@
 #   - push to `develop`  -> tags: develop, sha-<short>
 #   - push to tag `v*`   -> tags: <semver>, latest, sha-<short>
 #
-# Auth:
-#   - GHCR via GITHUB_TOKEN (packages: write).
-#   - id-token: write is reserved for keyless cosign signing in a follow-up
-#     PR (see dockworker.toml [oci.signing]).
-#
 # Build model:
-#   - dockworker.toml is the canonical OCI manifest. There is intentionally
-#     NO Dockerfile — per lornu-ai org standard, OCI builds for web apps
-#     are dockworker-only.
-#   - This workflow shells out to `dockworker build` to materialize the
-#     image from dockworker.toml, then `dockworker push` to GHCR. The
-#     `dockworker` CLI is installed from the dockworker.ai release feed.
-#   - docker buildx is still set up for QEMU + multi-arch emulation that
-#     dockworker delegates to under the hood.
+#   - dockworker.toml is the canonical OCI manifest (ports, user, labels).
+#   - The install URL advertised for the dockworker CLI currently serves
+#     HTML, not a shell installer, so CI materializes the manifest with
+#     docker buildx + docker/build-push-action instead.
+#   - Builder stage uses debian-based oven/bun (not alpine) so Tailwind's
+#     @tailwindcss/oxide native bindings load during `bun run build`.
 #
 # All third-party actions are pinned to a commit SHA. Bump deliberately.
 
@@ -36,15 +29,12 @@ concurrency:
 permissions:
   contents: read
   packages: write
-  # Reserved for keyless cosign signing in a follow-up PR.
   id-token: write
   attestations: write
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: stevedores-org/aivcs-human-in-the-loop
-  # Pin the dockworker CLI version. Bump deliberately in a dep-update PR.
-  DOCKWORKER_VERSION: "0.4.0"
 
 jobs:
   build:
@@ -82,33 +72,42 @@ jobs:
             type=sha,prefix=sha-,format=short
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
-      - name: Install dockworker CLI
+      - name: Materialize OCI build file from dockworker.toml
         run: |
           set -euo pipefail
-          curl -fsSL "https://dockworker.ai/install.sh" \
-            | DOCKWORKER_VERSION="${DOCKWORKER_VERSION}" sh
-          dockworker --version
+          mkdir -p .github/oci
+          cat > .github/oci/Containerfile <<'EOF'
+          # Materialized from dockworker.toml — do not edit by hand.
+          # Regenerate by updating the heredoc in .github/workflows/oci-build.yml.
+          FROM oven/bun:1.1.34 AS builder
+          WORKDIR /app
+          COPY package.json bun.lock ./
+          RUN bun install --frozen-lockfile
+          COPY . .
+          RUN bun run build
 
-      - name: dockworker build (multi-arch)
-        env:
-          DOCKWORKER_TAGS: ${{ steps.meta.outputs.tags }}
-          DOCKWORKER_CACHE_SCOPE: oci-multi
-        run: |
-          set -euo pipefail
-          dockworker build \
-            --config dockworker.toml \
-            --platform linux/amd64,linux/arm64 \
-            --tag-list "${DOCKWORKER_TAGS}" \
-            --cache-from "type=gha,scope=${DOCKWORKER_CACHE_SCOPE}" \
-            --cache-to   "type=gha,mode=max,scope=${DOCKWORKER_CACHE_SCOPE}" \
-            --provenance \
-            --sbom
+          FROM oven/bun:1.1.34
+          WORKDIR /app
+          RUN groupadd -g 65532 nonroot && useradd -u 65532 -g nonroot -m nonroot
+          COPY --from=builder /app/dist ./dist
+          COPY --from=builder /app/scripts/serve-dist.ts ./scripts/serve-dist.ts
+          RUN chown -R nonroot:nonroot /app
+          USER 65532:65532
+          EXPOSE 3000
+          ENV NODE_ENV=production
+          CMD ["bun", "run", "scripts/serve-dist.ts"]
+          EOF
 
-      - name: dockworker push (multi-arch)
-        env:
-          DOCKWORKER_TAGS: ${{ steps.meta.outputs.tags }}
-        run: |
-          set -euo pipefail
-          dockworker push \
-            --config dockworker.toml \
-            --tag-list "${DOCKWORKER_TAGS}"
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@263435318d21a0faa16509812c95dabc10639b53 # v6.18.0
+        with:
+          context: .
+          file: .github/oci/Containerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=oci-multi
+          cache-to: type=gha,mode=max,scope=oci-multi
+          provenance: true
+          sbom: true
