@@ -1,7 +1,8 @@
-# OCI build & publish for aivcs-human-in-the-loop.
+# OCI build & publish via dockworker.ai
 #
-# Builds a hermetic OCI tarball with `nix build` and pushes to Google Artifact
-# Registry via `skopeo copy`. No Docker daemon, Dockerfile, or buildx.
+# Canonical manifest: dockworker.toml (OCI spec 1.0, engine = "nix").
+# No Dockerfile, Docker daemon, or buildx — CI materializes the image with
+# `nix build .#<nix_output>` and pushes to GAR with skopeo.
 #
 # Triggers:
 #   - push to `develop`  -> tags: develop, sha-<short>
@@ -10,11 +11,6 @@
 # Required repo secrets:
 #   - GCP_WORKLOAD_IDENTITY_PROVIDER
 #   - GCP_SERVICE_ACCOUNT
-#
-# Optional repo variables (defaults shown):
-#   - GCP_PROJECT_ID  (gcp-lornu-ai)
-#   - GCP_REGION      (us-central1)
-#   - GAR_REPO        (lornu)
 
 name: oci-build
 
@@ -32,19 +28,67 @@ permissions:
   contents: read
   id-token: write
 
-env:
-  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID || 'gcp-lornu-ai' }}
-  GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
-  GAR_REPO: ${{ vars.GAR_REPO || 'lornu' }}
-  IMAGE_NAME: aivcs-human-in-the-loop
-
 jobs:
   build:
-    name: nix build & push to GAR
+    name: dockworker OCI build & push
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v5.0.0
+
+      - name: Validate dockworker.toml
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import sys
+          import tomllib
+
+          with open("dockworker.toml", "rb") as f:
+              cfg = tomllib.load(f)
+
+          assert cfg["oci"]["spec"] == "1.0", "oci.spec must be 1.0"
+          assert cfg["oci"]["builder"] == "nix", "oci.builder must be nix"
+          assert cfg["build"]["engine"] == "nix", "build.engine must be nix"
+          assert "nix_output" in cfg["oci"], "oci.nix_output is required"
+          assert cfg["registry"]["url"], "registry.url is required"
+          assert cfg["registry"]["name"], "registry.name is required"
+          print("dockworker.toml OK")
+          print(f"  package: {cfg['package']['name']}")
+          print(f"  nix_output: {cfg['oci']['nix_output']}")
+          print(f"  registry: {cfg['registry']['url']}/{cfg['registry']['name']}")
+          PY
+
+      - name: Load dockworker manifest
+        id: manifest
+        run: |
+          set -euo pipefail
+          python3 <<'PY' >> "$GITHUB_OUTPUT"
+          import tomllib
+
+          with open("dockworker.toml", "rb") as f:
+              cfg = tomllib.load(f)
+
+          registry_url = cfg["registry"]["url"].rstrip("/")
+          image_name = cfg["registry"]["name"]
+          nix_output = cfg["oci"]["nix_output"]
+          install_cmd = cfg["build"]["install"]
+          build_cmd = cfg["build"]["build"]
+
+          # us-central1-docker.pkg.dev/gcp-lornu-ai/lornu
+          host, _, path = registry_url.partition("/")
+          region, _, _ = host.partition("-docker.pkg.dev")
+          project, repo = path.split("/", 1)
+
+          print(f"nix_output={nix_output}")
+          print(f"install_cmd={install_cmd}")
+          print(f"build_cmd={build_cmd}")
+          print(f"gar_host={host}")
+          print(f"gcp_region={region}")
+          print(f"gcp_project={project}")
+          print(f"gar_repo={repo}")
+          print(f"image_name={image_name}")
+          print(f"gar_image={registry_url}/{image_name}")
+          PY
 
       - name: Install Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v1.2.2
@@ -71,18 +115,18 @@ jobs:
           echo '{"default":[{"type":"insecureAcceptAnything"}]}' > ~/.config/containers/policy.json
           echo 'unqualified-search-registries = ["docker.io"]' > ~/.config/containers/registries.conf
 
-      - name: Build frontend assets
+      - name: Build frontend assets (dockworker build phase)
         run: |
           set -euo pipefail
-          bun install --frozen-lockfile
-          bun run build
+          ${{ steps.manifest.outputs.install_cmd }}
+          ${{ steps.manifest.outputs.build_cmd }}
 
-      - name: Build OCI image with Nix
+      - name: Build OCI image (dockworker + nix)
         env:
           NIX_HITL_DIST: ${{ github.workspace }}/dist
         run: |
           set -euo pipefail
-          nix build .#oci -L --impure
+          nix build ".#${{ steps.manifest.outputs.nix_output }}" -L --impure
           ls -lh result
 
       - name: Compute image tags
@@ -103,13 +147,12 @@ jobs:
           cat tags.txt >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
-      - name: Push to GAR with skopeo
+      - name: Push to GAR (dockworker registry)
         env:
           ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
-          GAR_REGISTRY: ${{ env.GCP_REGION }}-docker.pkg.dev
+          GAR_IMAGE: ${{ steps.manifest.outputs.gar_image }}
         run: |
           set -euo pipefail
-          GAR_IMAGE="${GAR_REGISTRY}/${GCP_PROJECT_ID}/${GAR_REPO}/${IMAGE_NAME}"
           while IFS= read -r tag; do
             [ -n "$tag" ] || continue
             echo "Pushing ${GAR_IMAGE}:${tag}"

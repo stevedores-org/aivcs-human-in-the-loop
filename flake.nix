@@ -39,9 +39,9 @@
             '';
 
         packages = {
-          # Hermetic OCI tarball consumed by skopeo in CI. Frontend assets are
-          # produced by `bun run build` in the workflow (networked) and then
-          # copied into the image here (sandbox-safe, no Dockerfile).
+          # dockworker.ai OCI output (`oci.nix_output` in dockworker.toml).
+          # Frontend assets come from the dockworker build phase in CI, then
+          # are copied into the image here (sandbox-safe, no Dockerfile).
           oci = pkgs.dockerTools.buildLayeredImage {
             name = "aivcs-human-in-the-loop";
             tag = "latest";
@@ -71,7 +71,7 @@
                   "Human-in-the-loop UI for aivcs — agent branches, PR diffs, intent threads, CI checks, audit trail.";
                 "org.opencontainers.image.licenses" = "Apache-2.0";
                 "lornu.ai/component" = "aivcs-human-in-the-loop";
-                "lornu.ai/managed-by" = "nix-flake";
+                "lornu.ai/managed-by" = "dockworker";
                 "lornu.ai/runtime" = "bun";
                 "lornu.ai/kind" = "frontend-spa";
               };

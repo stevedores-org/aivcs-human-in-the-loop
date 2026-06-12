@@ -1,7 +1,7 @@
-# dockworker.toml - OCI manifest for aivcs-human-in-the-loop
+# dockworker.toml - OCI Standard manifest for aivcs-human-in-the-loop
 #
-# Images are built hermetically from flake.nix (`packages.oci`) and pushed to
-# Google Artifact Registry with skopeo. No Dockerfile and no Docker daemon.
+# Canonical packaging surface for dockworker.ai. No Dockerfile — CI materializes
+# this manifest with `nix build .#oci` (see flake.nix) and pushes to GAR via skopeo.
 
 [package]
 name = "aivcs-human-in-the-loop"
@@ -24,7 +24,7 @@ title = "aivcs-human-in-the-loop"
 
 [oci.image.labels]
 "lornu.ai/component" = "aivcs-human-in-the-loop"
-"lornu.ai/managed-by" = "nix-flake"
+"lornu.ai/managed-by" = "dockworker"
 "lornu.ai/runtime" = "bun"
 "lornu.ai/team" = "platform"
 "lornu.ai/kind" = "frontend-spa"
