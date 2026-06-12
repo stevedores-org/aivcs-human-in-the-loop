@@ -1,0 +1,108 @@
+# dockworker.toml - OCI Standard Configuration for aivcs-human-in-the-loop
+#
+# No Dockerfile - dockworker.ai builds OCI-compliant images from this manifest.
+# Pattern: Bun-built Vite app, served statically by `bun --bun vite preview`.
+#
+# Build sequence (executed by dockworker):
+#   1. base = oven/bun:1.1.34-alpine (pinned)
+#   2. bun install --frozen-lockfile
+#   3. bun run build  (produces ./dist via Vite)
+#   4. entrypoint serves ./dist on :3000
+#
+# This is consumed by the GitHub Actions workflow at
+# .github/workflows/oci-build.yml which pushes to GHCR on push to develop
+# and on tag `v*`.
+
+[package]
+name = "aivcs-human-in-the-loop"
+version = "0.1.0"
+description = "Human-in-the-loop UI for the agent-driven VCS (aivcs)"
+runtime = "bun"
+
+[oci]
+spec = "1.0"
+builder = "dockworker"
+# Pinned Bun base image. Bump deliberately in a dedicated dep-update PR.
+base = "oven/bun:1.1.34-alpine"
+
+[oci.image]
+authors = ["Stevedores Org <engineering@stevedores.org>"]
+url = "https://github.com/stevedores-org/aivcs-human-in-the-loop"
+source = "https://github.com/stevedores-org/aivcs-human-in-the-loop"
+vendor = "stevedores-org"
+licenses = "Apache-2.0"
+title = "aivcs-human-in-the-loop"
+
+[oci.image.labels]
+"lornu.ai/component" = "aivcs-human-in-the-loop"
+"lornu.ai/managed-by" = "dockworker"
+"lornu.ai/runtime" = "bun"
+"lornu.ai/team" = "platform"
+"lornu.ai/kind" = "frontend-spa"
+
+[oci.config]
+user = "nonroot:nonroot"
+workdir = "/app"
+# `bun --bun` keeps the runtime on bun (not node) for `vite preview`.
+# Vite preview serves the built `./dist` as a static SPA fallback.
+entrypoint = [
+  "bun",
+  "--bun",
+  "./node_modules/.bin/vite",
+  "preview",
+  "--host",
+  "0.0.0.0",
+  "--port",
+  "3000",
+  "--strictPort",
+]
+expose = ["3000/tcp"]
+stop_signal = "SIGTERM"
+
+[oci.config.env]
+NODE_ENV = "production"
+# AIVCS_API_URL and SSO_ISSUER are injected at runtime via k8s overlay
+# ConfigMaps (aivcs-hitl-config), not baked into the image.
+
+[build]
+runtime = "bun"
+engine = "dockworker"
+
+# Multi-stage: install + build in builder, copy `dist/` + minimal runtime
+# (node_modules pruned to production+vite) into the final image.
+[[build.targets]]
+name = "aivcs-human-in-the-loop"
+image = "aivcs-human-in-the-loop"
+steps = ["bun install --frozen-lockfile", "bun run build"]
+output_dir = "dist"
+
+[oci.platforms]
+architectures = ["amd64", "arm64"]
+
+[oci.security]
+user = 65532
+group = 65532
+read_only_rootfs = true
+no_new_privileges = true
+drop_capabilities = ["ALL"]
+
+[oci.sbom]
+enabled = true
+format = "spdx-json"
+
+[oci.signing]
+# Keyless cosign signing wired up in a follow-up PR (see oci-build.yml).
+enabled = false
+provider = "sigstore"
+keyless = true
+
+[registry]
+# Primary: GHCR. Mirroring to ACR/GAR is a follow-up (see lornu.ai pattern).
+url = "ghcr.io/stevedores-org"
+name = "aivcs-human-in-the-loop"
+tags = ["develop", "latest"]
+
+[deploy]
+targets = ["kubernetes"]
+namespace = "aivcs-hitl-dev"
+replicas = 1
