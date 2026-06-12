@@ -1,29 +1,66 @@
 import { GitPullRequest, ChevronDown, GitMerge, Flag, XCircle, Bot } from "lucide-react";
 
-const diffLines = [
-  { type: "context", lineOld: "1", lineNew: "1", content: "import jwt from 'jsonwebtoken';" },
-  { type: "context", lineOld: "2", lineNew: "2", content: "import bcrypt from 'bcryptjs';" },
-  { type: "context", lineOld: "3", lineNew: "3", content: "" },
-  { type: "removed", lineOld: "4", lineNew: "", content: "export class AuthService {" },
-  { type: "removed", lineOld: "5", lineNew: "", content: "  private secretKey: string = process.env.JWT_SECRET;" },
-  { type: "removed", lineOld: "6", lineNew: "", content: "  private tokenExpiry: string = '24h';" },
-  { type: "added", lineOld: "", lineNew: "4", content: "export class AuthService implements IAuthService {" },
-  { type: "added", lineOld: "", lineNew: "5", content: "  private readonly config: AuthConfig;" },
-  { type: "added", lineOld: "", lineNew: "6", content: "  private readonly tokenService: TokenService;" },
-  { type: "context", lineOld: "7", lineNew: "7", content: "" },
-  { type: "removed", lineOld: "8", lineNew: "", content: "  async validateUser(username: string, password: string) {" },
-  { type: "removed", lineOld: "9", lineNew: "", content: "    const user = await db.users.findOne({ username });" },
-  { type: "removed", lineOld: "10", lineNew: "", content: "    if (!user) return null;" },
-  { type: "added", lineOld: "", lineNew: "8", content: "  async validateUser(credentials: UserCredentials): Promise<AuthResult> {" },
-  { type: "added", lineOld: "", lineNew: "9", content: "    const user = await this.userRepository.findByUsername(" },
-  { type: "added", lineOld: "", lineNew: "10", content: "      credentials.username," },
-  { type: "added", lineOld: "", lineNew: "11", content: "    );" },
-  { type: "context", lineOld: "11", lineNew: "12", content: "    const isValid = await bcrypt.compare(" },
-  { type: "context", lineOld: "12", lineNew: "13", content: "      password, user.passwordHash" },
-  { type: "context", lineOld: "13", lineNew: "14", content: "    );" },
-];
+interface PullRequest {
+  id: string;
+  number: number;
+  title: string;
+  base: string;
+  head: string;
+  status: string;
+  agent_intent: string;
+  ci_summary: { total: number; succeeded: number; failed: number; pending: number };
+}
 
-export function PRDiffPanel() {
+interface DiffFile {
+  path: string;
+  additions: number;
+  deletions: number;
+  patch: string;
+}
+
+interface PRDiffPanelProps {
+  pr: PullRequest;
+  diff: { files: DiffFile[] };
+}
+
+export function PRDiffPanel({ pr, diff }: PRDiffPanelProps) {
+  // Parse patch text to lines for visual diffing
+  const parsePatch = (patch: string) => {
+    const lines = patch.split("\n");
+    let lineOld = 1;
+    let lineNew = 1;
+
+    return lines.map((line) => {
+      if (line.startsWith("@@")) {
+        const match = line.match(/@@\s+-(\d+),?\d*\s+\+(\d+),?\d*\s+@@/);
+        if (match) {
+          lineOld = parseInt(match[1], 10);
+          lineNew = parseInt(match[2], 10);
+        }
+        return { type: "header", lineOld: "", lineNew: "", content: line };
+      } else if (line.startsWith("+")) {
+        const content = line.substring(1);
+        const res = { type: "added", lineOld: "", lineNew: lineNew.toString(), content };
+        lineNew++;
+        return res;
+      } else if (line.startsWith("-")) {
+        const content = line.substring(1);
+        const res = { type: "removed", lineOld: lineOld.toString(), lineNew: "", content };
+        lineOld++;
+        return res;
+      } else {
+        const content = line.startsWith(" ") ? line.substring(1) : line;
+        const res = { type: "context", lineOld: lineOld.toString(), lineNew: lineNew.toString(), content };
+        lineOld++;
+        lineNew++;
+        return res;
+      }
+    });
+  };
+
+  const file = diff.files[0] || { path: "unknown", additions: 0, deletions: 0, patch: "" };
+  const diffLines = parsePatch(file.patch);
+
   return (
     <div className="flex flex-col rounded border border-border bg-card overflow-hidden h-full">
       {/* Header */}
@@ -31,10 +68,12 @@ export function PRDiffPanel() {
         <div>
           <div className="flex items-center gap-2">
             <GitPullRequest size={13} className="text-green-400 shrink-0" />
-            <span style={{ fontSize: "12px", fontWeight: 600 }} className="text-foreground">Full Request #379</span>
-            <span className="px-1.5 py-0.5 rounded text-[10px] bg-green-400/10 text-green-400 border border-green-400/20">Open</span>
+            <span style={{ fontSize: "12px", fontWeight: 600 }} className="text-foreground">Full Request #{pr.number}</span>
+            <span className="px-1.5 py-0.5 rounded text-[10px] bg-green-400/10 text-green-400 border border-green-400/20 capitalize">
+              {pr.status}
+            </span>
           </div>
-          <div className="text-muted-foreground mt-0.5" style={{ fontSize: "11px" }}>Refactor Authentication Service</div>
+          <div className="text-muted-foreground mt-0.5" style={{ fontSize: "11px" }}>{pr.title}</div>
         </div>
         <div className="flex items-center gap-1 text-muted-foreground shrink-0" style={{ fontSize: "11px" }}>
           <Bot size={11} />
@@ -46,12 +85,12 @@ export function PRDiffPanel() {
       {/* File path bar */}
       <div className="px-3 py-1.5 border-b border-border bg-secondary flex items-center justify-between shrink-0">
         <div className="flex items-center gap-1" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "10px" }}>
-          <span className="text-muted-foreground">src/services/</span>
-          <span className="text-foreground">AuthService.ts</span>
+          <span className="text-muted-foreground">{file.path.substring(0, file.path.lastIndexOf("/") + 1)}</span>
+          <span className="text-foreground">{file.path.substring(file.path.lastIndexOf("/") + 1)}</span>
         </div>
         <div className="flex items-center gap-2" style={{ fontSize: "10px" }}>
-          <span className="text-green-400">+14</span>
-          <span className="text-red-400">−6</span>
+          <span className="text-green-400">+{file.additions}</span>
+          <span className="text-red-400">−{file.deletions}</span>
           <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary">
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
             <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>1/1 · 1/3</span>
@@ -69,6 +108,8 @@ export function PRDiffPanel() {
                 ? "bg-red-500/10 border-l-2 border-red-500/60"
                 : line.type === "added"
                 ? "bg-green-500/10 border-l-2 border-green-500/60"
+                : line.type === "header"
+                ? "bg-secondary/40 text-muted-foreground"
                 : "border-l-2 border-transparent"
             }`}
           >
@@ -84,7 +125,7 @@ export function PRDiffPanel() {
             <span
               className="py-0.5 whitespace-pre leading-relaxed flex-1"
               style={{
-                color: line.type === "removed" ? "#ffa198" : line.type === "added" ? "#7ee787" : "#c9d1d9",
+                color: line.type === "removed" ? "#ffa198" : line.type === "added" ? "#7ee787" : line.type === "header" ? "#8b949e" : "#c9d1d9",
               }}
             >
               {line.content || " "}

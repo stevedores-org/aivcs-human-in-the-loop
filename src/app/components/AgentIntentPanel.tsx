@@ -1,46 +1,46 @@
+import { useState } from "react";
 import { Bot, ExternalLink, ChevronRight } from "lucide-react";
 
-const agentComments = [
-  {
-    agent: "Optimizer-7 (Agent)",
-    time: "2m ago",
-    avatar: "O7",
-    color: "#388bfd",
-    message: "Refactored AuthService to implement dependency injection pattern. Extracted TokenService for better separation of concerns. All 47 existing tests pass.",
-    type: "analysis",
-  },
-  {
-    agent: "Jane Taylor (You)",
-    time: "5m ago",
-    avatar: "JT",
-    color: "#a371f7",
-    message: "LGTM on the interface extraction. Can you also add rate limiting to the validateUser method? We've had issues with brute force attempts.",
-    type: "human",
-  },
-  {
-    agent: "SecurityAgent-3",
-    time: "8m ago",
-    avatar: "S3",
-    color: "#f85149",
-    message: "⚠ Detected hardcoded JWT_SECRET fallback in line 5. Recommend using environment validation at startup instead of runtime fallback.",
-    type: "warning",
-  },
-  {
-    agent: "Guillermo Ramirez (Auth)",
-    time: "12m ago",
-    avatar: "GR",
-    color: "#3fb950",
-    message: "Following the AuthConfig pattern. Make sure the TokenService is properly injected in the DI container — see bootstrap.ts line 42.",
-    type: "comment",
-  },
+interface Message {
+  role: "agent" | "human";
+  at: string;
+  body: string;
+}
+
+interface AgentIntentPanelProps {
+  comments: Message[];
+  guidance?: string[];
+  onAddComment?: (body: string) => void;
+}
+
+const DEFAULT_GUIDANCE = [
+  "Ensure PR tests pass before merging",
+  "Review security warnings highlighted by agents",
 ];
 
-const guidance = [
-  "Ensure PR, it is configured",
-  "Review security policy for PRs in progress",
-];
+export function AgentIntentPanel({ comments, guidance = DEFAULT_GUIDANCE, onAddComment }: AgentIntentPanelProps) {
+  const [replyText, setReplyText] = useState("");
 
-export function AgentIntentPanel() {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyText.trim()) return;
+    if (onAddComment) {
+      onAddComment(replyText);
+      setReplyText("");
+    }
+  };
+
+  // Helper to format date string to relative time
+  const formatTime = (at: string) => {
+    const diffMs = new Date().getTime() - new Date(at).getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return "just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return new Date(at).toLocaleDateString();
+  };
+
   return (
     <div className="flex flex-col rounded border border-border bg-card overflow-hidden h-full">
       {/* Header */}
@@ -56,35 +56,66 @@ export function AgentIntentPanel() {
 
       {/* Comments thread */}
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
-        {agentComments.map((comment, i) => (
-          <div key={i} className="flex gap-2">
-            <div
-              className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-              style={{ backgroundColor: comment.color + "25", border: `1px solid ${comment.color}40` }}
-            >
-              <span style={{ fontSize: "8px", fontWeight: 700, color: comment.color }}>{comment.avatar}</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <span style={{ fontSize: "11px", fontWeight: 600, color: comment.color }}>{comment.agent}</span>
-                <span style={{ fontSize: "10px" }} className="text-muted-foreground">{comment.time}</span>
-              </div>
+        {comments.map((comment, i) => {
+          const isAgent = comment.role === "agent";
+          const color = isAgent ? "#388bfd" : "#a371f7";
+          const isWarning = comment.body.includes("⚠") || comment.body.toLowerCase().includes("warning");
+
+          return (
+            <div key={i} className="flex gap-2">
               <div
-                className="rounded p-2"
-                style={{
-                  fontSize: "11px",
-                  lineHeight: "1.5",
-                  color: "#c9d1d9",
-                  backgroundColor: comment.type === "warning" ? "rgba(248,81,73,0.08)" : "rgba(255,255,255,0.04)",
-                  border: `1px solid ${comment.type === "warning" ? "rgba(248,81,73,0.2)" : "rgba(48,54,61,0.8)"}`,
-                }}
+                className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                style={{ backgroundColor: color + "25", border: `1px solid ${color}40` }}
               >
-                {comment.message}
+                <span style={{ fontSize: "8px", fontWeight: 700, color }}>
+                  {isAgent ? "AG" : "HR"}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <span style={{ fontSize: "11px", fontWeight: 600, color }}>
+                    {isAgent ? "AIVCS Agent" : "Human Reviewer"}
+                  </span>
+                  <span style={{ fontSize: "10px" }} className="text-muted-foreground">
+                    {formatTime(comment.at)}
+                  </span>
+                </div>
+                <div
+                  className="rounded p-2"
+                  style={{
+                    fontSize: "11px",
+                    lineHeight: "1.5",
+                    color: "#c9d1d9",
+                    backgroundColor: isWarning ? "rgba(248,81,73,0.08)" : "rgba(255,255,255,0.04)",
+                    border: `1px solid ${isWarning ? "rgba(248,81,73,0.2)" : "rgba(48,54,61,0.8)"}`,
+                  }}
+                >
+                  {comment.body}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
+
+      {/* Reply Composer */}
+      {onAddComment && (
+        <form onSubmit={handleSubmit} className="border-t border-border p-2 shrink-0 flex gap-2">
+          <input
+            type="text"
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            placeholder="Reply as human..."
+            className="flex-1 px-2.5 py-1 rounded border border-border bg-background text-foreground text-[11px] outline-none focus:border-primary"
+          />
+          <button
+            type="submit"
+            className="px-3 py-1 rounded bg-primary text-primary-foreground font-semibold hover:bg-primary/95 transition-colors text-[11px]"
+          >
+            Reply
+          </button>
+        </form>
+      )}
 
       {/* Agent Guidance */}
       <div className="border-t border-border p-2 shrink-0">
