@@ -99,10 +99,12 @@ jobs:
       - name: Test
         run: |
           set -euo pipefail
-          if [ -f package.json ]; then
+          if [ ! -f package.json ]; then
+            echo "skip: package.json not present (Step A / #4)"
+          elif find . -path ./node_modules -prune -o \( -name '*.test.*' -o -name '*.spec.*' -o -name '*_test_*' -o -name '*_spec_*' \) -print -quit | grep -q .; then
             bun test
           else
-            echo "skip: package.json not present (Step A / #4)"
+            echo "skip: no test files yet"
           fi
 
       - name: Build
