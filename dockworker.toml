@@ -25,14 +25,14 @@ title = "aivcs-human-in-the-loop"
 [oci.image.labels]
 "lornu.ai/component" = "aivcs-human-in-the-loop"
 "lornu.ai/managed-by" = "dockworker"
-"lornu.ai/runtime" = "bun"
+"lornu.ai/runtime" = "caddy"
 "lornu.ai/team" = "platform"
 "lornu.ai/kind" = "frontend-spa"
 
 [oci.config]
 user = "65532:65532"
-workdir = "/app"
-entrypoint = ["bun", "run", "/app/scripts/serve-dist.ts"]
+workdir = "/srv"
+entrypoint = ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
 expose = ["3000/tcp"]
 stop_signal = "SIGTERM"
 
