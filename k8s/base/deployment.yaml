@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/name: aivcs-human-in-the-loop
     app.kubernetes.io/component: frontend
     app.kubernetes.io/part-of: aivcs
-    lornu.ai/managed-by: dockworker
+    lornu.ai/managed-by: nix-flake
 spec:
   replicas: 1
   revisionHistoryLimit: 5
@@ -35,7 +35,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: app
-          image: ghcr.io/stevedores-org/aivcs-human-in-the-loop:develop
+          image: us-central1-docker.pkg.dev/gcp-lornu-ai/lornu/aivcs-human-in-the-loop:develop
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

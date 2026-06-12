@@ -7,7 +7,7 @@ resources:
   - ../../base
 
 images:
-  - name: ghcr.io/stevedores-org/aivcs-human-in-the-loop
+  - name: us-central1-docker.pkg.dev/gcp-lornu-ai/lornu/aivcs-human-in-the-loop
     newTag: develop
 
 configMapGenerator:
