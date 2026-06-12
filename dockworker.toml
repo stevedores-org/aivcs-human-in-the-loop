@@ -1,17 +1,14 @@
 # dockworker.toml - OCI Standard Configuration for aivcs-human-in-the-loop
 #
-# No Dockerfile - dockworker.ai builds OCI-compliant images from this manifest.
-# Pattern: Bun-built Vite app, served statically by `bun --bun vite preview`.
+# Canonical OCI manifest for this app. CI materializes it via docker buildx
+# (see .github/workflows/oci-build.yml) because the dockworker CLI install
+# feed at dockworker.ai/install.sh currently serves HTML, not an installer.
 #
-# Build sequence (executed by dockworker):
-#   1. base = oven/bun:1.1.34-alpine (pinned)
+# Build sequence:
+#   1. base = oven/bun:1.1.34 (debian; alpine breaks @tailwindcss/oxide)
 #   2. bun install --frozen-lockfile
 #   3. bun run build  (produces ./dist via Vite)
-#   4. entrypoint serves ./dist on :3000
-#
-# This is consumed by the GitHub Actions workflow at
-# .github/workflows/oci-build.yml which pushes to GHCR on push to develop
-# and on tag `v*`.
+#   4. entrypoint serves ./dist on :3000 via scripts/serve-dist.ts
 
 [package]
 name = "aivcs-human-in-the-loop"
@@ -21,9 +18,9 @@ runtime = "bun"
 
 [oci]
 spec = "1.0"
-builder = "dockworker"
-# Pinned Bun base image. Bump deliberately in a dedicated dep-update PR.
-base = "oven/bun:1.1.34-alpine"
+builder = "buildx"
+# Debian-based Bun. Alpine fails `bun run build` (Tailwind oxide native binding).
+base = "oven/bun:1.1.34"
 
 [oci.image]
 authors = ["Stevedores Org <engineering@stevedores.org>"]
@@ -43,19 +40,7 @@ title = "aivcs-human-in-the-loop"
 [oci.config]
 user = "nonroot:nonroot"
 workdir = "/app"
-# `bun --bun` keeps the runtime on bun (not node) for `vite preview`.
-# Vite preview serves the built `./dist` as a static SPA fallback.
-entrypoint = [
-  "bun",
-  "--bun",
-  "./node_modules/.bin/vite",
-  "preview",
-  "--host",
-  "0.0.0.0",
-  "--port",
-  "3000",
-  "--strictPort",
-]
+entrypoint = ["bun", "run", "scripts/serve-dist.ts"]
 expose = ["3000/tcp"]
 stop_signal = "SIGTERM"
 
@@ -66,10 +51,8 @@ NODE_ENV = "production"
 
 [build]
 runtime = "bun"
-engine = "dockworker"
+engine = "buildx"
 
-# Multi-stage: install + build in builder, copy `dist/` + minimal runtime
-# (node_modules pruned to production+vite) into the final image.
 [[build.targets]]
 name = "aivcs-human-in-the-loop"
 image = "aivcs-human-in-the-loop"
@@ -91,13 +74,11 @@ enabled = true
 format = "spdx-json"
 
 [oci.signing]
-# Keyless cosign signing wired up in a follow-up PR (see oci-build.yml).
 enabled = false
 provider = "sigstore"
 keyless = true
 
 [registry]
-# Primary: GHCR. Mirroring to ACR/GAR is a follow-up (see lornu.ai pattern).
 url = "ghcr.io/stevedores-org"
 name = "aivcs-human-in-the-loop"
 tags = ["develop", "latest"]
