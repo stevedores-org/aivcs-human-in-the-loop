@@ -99,7 +99,7 @@ jobs:
           EOF
 
       - name: Build and push multi-arch image
-        uses: docker/build-push-action@263435318d21a0faa16509812c95dabc10639b53 # v6.18.0
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
           file: .github/oci/Containerfile
