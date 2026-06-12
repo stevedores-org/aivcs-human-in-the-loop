@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.github/oci/
 .local-ci-cache/
 .DS_Store
 .env

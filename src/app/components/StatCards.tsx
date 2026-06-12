@@ -1,6 +1,16 @@
 import { Bot, GitPullRequest, CheckCircle, GitMerge } from "lucide-react";
 
-const stats = [
+export interface StatCardItem {
+  label: string;
+  value: string;
+  sub: string;
+  icon: React.ComponentType<any>;
+  color: string;
+  bg: string;
+  border: string;
+}
+
+const defaultStats: StatCardItem[] = [
   {
     label: "Active Agents",
     value: "8",
@@ -39,7 +49,11 @@ const stats = [
   },
 ];
 
-export function StatCards() {
+interface StatCardsProps {
+  stats?: StatCardItem[];
+}
+
+export function StatCards({ stats = defaultStats }: StatCardsProps) {
   return (
     <div className="grid grid-cols-4 gap-3">
       {stats.map(({ label, value, sub, icon: Icon, color, bg, border }) => (
@@ -55,9 +69,23 @@ export function StatCards() {
             <Icon size={15} style={{ color }} />
           </div>
           <div>
-            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "22px", fontWeight: 700, color, lineHeight: 1 }}>{value}</div>
-            <div className="text-muted-foreground mt-0.5" style={{ fontSize: "11px" }}>{label}</div>
-            <div style={{ fontSize: "10px", color: color + "aa" }} className="mt-0.5">{sub}</div>
+            <div
+              style={{
+                fontFamily: "'JetBrains Mono', monospace",
+                fontSize: "22px",
+                fontWeight: 700,
+                color,
+                lineHeight: 1,
+              }}
+            >
+              {value}
+            </div>
+            <div className="text-muted-foreground mt-0.5" style={{ fontSize: "11px" }}>
+              {label}
+            </div>
+            <div style={{ fontSize: "10px", color: color + "aa" }} className="mt-0.5">
+              {sub}
+            </div>
           </div>
         </div>
       ))}
