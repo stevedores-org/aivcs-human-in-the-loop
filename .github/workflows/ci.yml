@@ -39,8 +39,8 @@ jobs:
 
     steps:
       - name: Checkout
-        # actions/checkout v5.0.0
-        uses: actions/checkout@8558fd74291d67161a8a78ce36a881fa63b766a9
+        # actions/checkout v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
         with:
           # full history so gitleaks can scan the diff against the base
           fetch-depth: 0
@@ -64,7 +64,7 @@ jobs:
 
       - name: Install dependencies (Bun)
         # `bun install` is a no-op until package.json lands in Step A (#4);
-        # the `--frozen-lockfile` form errors only if bun.lockb is out of
+        # `--frozen-lockfile` errors only if bun.lock / bun.lockb is out of
         # sync. We tolerate both states explicitly.
         run: |
           set -euo pipefail
@@ -88,10 +88,12 @@ jobs:
       - name: Lint
         run: |
           set -euo pipefail
-          if [ -f package.json ]; then
+          if [ ! -f package.json ]; then
+            echo "skip: package.json not present (Step A / #4)"
+          elif grep -q '"eslint"' package.json || compgen -G 'eslint.config.*' >/dev/null || compgen -G '.eslintrc.*' >/dev/null; then
             bun run eslint .
           else
-            echo "skip: package.json not present (Step A / #4)"
+            echo "skip: eslint not configured yet"
           fi
 
       - name: Test
@@ -115,7 +117,13 @@ jobs:
       - name: Gitleaks
         # Always run — even with an empty tree this is fast and the gate
         # is the whole point. `--no-banner --redact` matches AGENTS.md §6.
-        run: gitleaks detect --no-banner --redact
+        run: |
+          set -euo pipefail
+          if [ -f .gitleaks.toml ]; then
+            gitleaks detect --no-banner --redact --config .gitleaks.toml
+          else
+            gitleaks detect --no-banner --redact
+          fi
 
       - name: Summary
         if: always()
