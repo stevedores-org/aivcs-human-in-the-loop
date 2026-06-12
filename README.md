@@ -31,7 +31,7 @@ Tracker: [#2](https://github.com/stevedores-org/aivcs-human-in-the-loop/issues/2
 
 - **Frontend:** Vite + React 18 + TypeScript + Tailwind 4 + shadcn/ui (Radix primitives)
 - **Runtime:** Bun (>= 1.1)
-- **Build:** Vite → OCI image via `flake.nix` + `skopeo` (no Dockerfile, no Docker daemon)
+- **Build:** Vite → OCI image via **dockworker.ai** (`dockworker.toml` + `flake.nix`; no Dockerfile)
 - **Deploy:** Kubernetes via Kustomize + Flux + Gateway API (Lornu standard; no Helm)
 
 ## Local dev
@@ -55,14 +55,18 @@ PRs base on `develop`. See [AGENTS.md](./AGENTS.md).
 
 ### Image
 
-OCI images are built and pushed by `.github/workflows/oci-build.yml`:
+OCI images are built and pushed by `.github/workflows/oci-build.yml` using the
+[dockworker.ai](https://dockworker.ai) OCI standard — **no Dockerfile**:
 
-- `nix build .#oci` produces an OCI tarball
-- `skopeo copy` pushes to Google Artifact Registry (GAR)
+1. Validate and load [`dockworker.toml`](./dockworker.toml) (canonical manifest)
+2. Run the dockworker build phase (`bun install`, `bun run build`)
+3. `nix build .#oci` packages the pre-built assets into an OCI tarball
+4. `skopeo copy` pushes to the registry declared in `dockworker.toml`
+
 - push to `develop` → `us-central1-docker.pkg.dev/gcp-lornu-ai/lornu/aivcs-human-in-the-loop:develop`
 - push to tag `v*`  → same repo with semver + `latest`
 
-Build manifest: [`dockworker.toml`](./dockworker.toml). Nix derivation: [`flake.nix`](./flake.nix).
+Nix derivation: [`flake.nix`](./flake.nix) (`packages.oci`, referenced by `oci.nix_output`).
 
 ### k8s layout
 

@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/name: aivcs-human-in-the-loop
     app.kubernetes.io/component: frontend
     app.kubernetes.io/part-of: aivcs
-    lornu.ai/managed-by: nix-flake
+    lornu.ai/managed-by: dockworker
 spec:
   replicas: 1
   revisionHistoryLimit: 5
