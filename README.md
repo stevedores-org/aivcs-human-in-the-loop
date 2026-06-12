@@ -68,6 +68,9 @@ OCI images are built and pushed by `.github/workflows/oci-build.yml` using the
 
 Nix derivation: [`flake.nix`](./flake.nix) (`packages.oci`, referenced by `oci.nix_output`).
 
+GitHub Actions auth uses OIDC via repo secrets synced from GCP Secret Manager
+(`GCP_WIF_PROVIDER`, `GCP_WIF_SERVICE_ACCOUNT` in project `gcp-lornu-ai`).
+
 ### k8s layout
 
 ```
