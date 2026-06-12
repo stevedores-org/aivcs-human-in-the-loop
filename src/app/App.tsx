@@ -7,114 +7,156 @@ import { AgentIntentPanel } from "./components/AgentIntentPanel";
 import { AuditTrail } from "./components/AuditTrail";
 import { BranchGraph } from "./components/BranchGraph";
 import { CIChecks } from "./components/CIChecks";
-
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { Toaster } from "sonner";
 import {
+  useBranches,
   usePullRequest,
   usePullRequestDiff,
   useAgentIntent,
   useCIChecks,
   useActivity,
-  addComment,
-} from "../lib/api/client";
+  useAddComment,
+} from "../lib/api";
 
-export default function App() {
-  const [activePrId] = useState<string>("pr-125");
+function DashboardContent() {
+  const [activePrId, setActivePrId] = useState<string>("379");
 
-  const { data: pr, loading: prLoading, error: prError } = usePullRequest(activePrId);
-  const { data: diff, loading: diffLoading, error: diffError } = usePullRequestDiff(activePrId);
-  const { data: intent, loading: intentLoading, error: intentError, mutate: mutateIntent } = useAgentIntent(activePrId);
-  const { data: checks, loading: checksLoading, error: checksError } = useCIChecks(activePrId);
-  const { data: activity, loading: activityLoading, error: activityError } = useActivity();
+  // Call the typed api hooks
+  const {
+    data: branches,
+    isLoading: isLoadingBranches,
+    error: errorBranches,
+  } = useBranches();
 
-  const handleAddComment = async (body: string) => {
-    try {
-      await addComment(activePrId, body);
-      mutateIntent();
-    } catch (err) {
-      console.error("Failed to add comment:", err);
+  const {
+    data: pullRequest,
+    isLoading: isLoadingPR,
+    error: errorPR,
+  } = usePullRequest(activePrId);
+
+  const {
+    data: diff,
+    isLoading: isLoadingDiff,
+    error: errorDiff,
+  } = usePullRequestDiff(activePrId);
+
+  const {
+    data: intentThread,
+    isLoading: isLoadingIntent,
+    error: errorIntent,
+    refetch: refetchIntent,
+  } = useAgentIntent(activePrId);
+
+  const {
+    data: checks,
+    isLoading: isLoadingChecks,
+    error: errorChecks,
+  } = useCIChecks(activePrId);
+
+  const {
+    data: activity,
+    isLoading: isLoadingActivity,
+    error: errorActivity,
+  } = useActivity({ limit: 50 });
+
+  const { addComment, isMutating: isAddingComment } = useAddComment(activePrId);
+
+  const handleSelectBranch = (branchName: string) => {
+    const branch = branches?.find((b) => b.name === branchName);
+    if (branch) {
+      setActivePrId(branch.id);
     }
   };
 
-  const isGlobalError = prError || diffError || intentError || checksError || activityError;
+  const handleAddComment = async (body: string) => {
+    const res = await addComment(body);
+    refetchIntent();
+    return res;
+  };
+
+  const activeBranch = branches?.find((b) => b.id === activePrId);
+  const activeBranchName = activeBranch ? activeBranch.name : "feature/auth-refactor";
 
   return (
     <div
       className="flex h-screen w-screen overflow-hidden bg-background text-foreground"
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
-      <Sidebar />
+      <Sidebar
+        branches={branches}
+        activeBranchName={activeBranchName}
+        onSelectBranch={handleSelectBranch}
+        isLoading={isLoadingBranches}
+        error={errorBranches}
+      />
 
       {/* Main area */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <TopBar />
 
-        {isGlobalError ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-            <div className="text-red-400 text-lg font-bold mb-2">Error Loading Dashboard</div>
-            <div className="text-muted-foreground text-sm max-w-md">
-              We encountered a problem fetching the data-fabric status. Make sure the aivcs-api service is running at http://localhost:3000 or set VITE_USE_MOCKS=1 for design preview mode.
+        <main className="flex-1 overflow-hidden p-3 flex flex-col gap-3 min-h-0">
+          {/* Stat cards row */}
+          <StatCards />
+
+          {/* Middle row: PR Diff + Agent Intent */}
+          <div className="flex gap-3 flex-1 min-h-0" style={{ minHeight: 0, flex: "1 1 0" }}>
+            {/* PR Diff — takes most of the space */}
+            <div className="flex flex-col min-h-0" style={{ flex: "3 1 0" }}>
+              <PRDiffPanel
+                pullRequest={pullRequest}
+                diff={diff}
+                isLoading={isLoadingPR || isLoadingDiff}
+                error={errorPR || errorDiff}
+              />
+            </div>
+
+            {/* Agent Intent panel */}
+            <div className="flex flex-col min-h-0" style={{ flex: "1.2 1 0" }}>
+              <AgentIntentPanel
+                intentThread={intentThread}
+                isLoading={isLoadingIntent}
+                error={errorIntent}
+                onAddComment={handleAddComment}
+                isAddingComment={isAddingComment}
+              />
             </div>
           </div>
-        ) : (
-          <main className="flex-1 overflow-hidden p-3 flex flex-col gap-3 min-h-0">
-            {/* Stat cards row */}
-            <StatCards />
 
-            {/* Middle row: PR Diff + Agent Intent */}
-            <div className="flex gap-3 flex-1 min-h-0" style={{ minHeight: 0, flex: "1 1 0" }}>
-              {/* PR Diff — takes most of the space */}
-              <div className="flex flex-col min-h-0" style={{ flex: "3 1 0" }}>
-                {prLoading || diffLoading || !pr || !diff ? (
-                  <div className="flex-1 flex items-center justify-center border border-border rounded bg-card text-muted-foreground text-sm">
-                    Loading Pull Request & Diff...
-                  </div>
-                ) : (
-                  <PRDiffPanel pr={pr} diff={diff} />
-                )}
-              </div>
-
-              {/* Agent Intent panel */}
-              <div className="flex flex-col min-h-0" style={{ flex: "1.2 1 0" }}>
-                {intentLoading || !intent ? (
-                  <div className="flex-1 flex items-center justify-center border border-border rounded bg-card text-muted-foreground text-sm">
-                    Loading Intent Thread...
-                  </div>
-                ) : (
-                  <AgentIntentPanel
-                    comments={intent.thread}
-                    onAddComment={handleAddComment}
-                  />
-                )}
-              </div>
+          {/* Bottom row: Audit Trail + Branch Graph + CI Checks */}
+          <div className="flex gap-3" style={{ height: "200px", minHeight: "200px" }}>
+            <div style={{ flex: "1 1 0" }} className="min-w-0 h-full">
+              <AuditTrail
+                items={activity?.items ?? null}
+                isLoading={isLoadingActivity}
+                error={errorActivity}
+              />
             </div>
-
-            {/* Bottom row: Audit Trail + Branch Graph + CI Checks */}
-            <div className="flex gap-3" style={{ height: "200px", minHeight: "200px" }}>
-              <div style={{ flex: "1 1 0" }} className="min-w-0 h-full">
-                {activityLoading || !activity ? (
-                  <div className="h-full flex items-center justify-center border border-border rounded bg-card text-muted-foreground text-[11px]">
-                    Loading Audit Trail...
-                  </div>
-                ) : (
-                  <AuditTrail items={activity.items} />
-                )}
-              </div>
-              <div style={{ flex: "1.5 1 0" }} className="min-w-0 h-full">
-                <BranchGraph />
-              </div>
-              <div style={{ flex: "1 1 0" }} className="min-w-0 h-full">
-                {checksLoading || !checks || activityLoading || !activity ? (
-                  <div className="h-full flex items-center justify-center border border-border rounded bg-card text-muted-foreground text-[11px]">
-                    Loading CI Checks...
-                  </div>
-                ) : (
-                  <CIChecks checks={checks.checks} activity={activity.items} />
-                )}
-              </div>
+            <div style={{ flex: "1.5 1 0" }} className="min-w-0 h-full">
+              <BranchGraph branches={branches} />
             </div>
-          </main>
-        )}
+            <div style={{ flex: "1 1 0" }} className="min-w-0 h-full">
+              <CIChecks
+                checks={checks}
+                isLoadingChecks={isLoadingChecks}
+                errorChecks={errorChecks}
+                activities={activity?.items ?? null}
+                isLoadingActivities={isLoadingActivity}
+                errorActivities={errorActivity}
+              />
+            </div>
+          </div>
+        </main>
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <DashboardContent />
+      <Toaster theme="dark" closeButton position="top-right" />
+    </ErrorBoundary>
   );
 }
