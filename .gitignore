@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.local-ci-cache/
+.DS_Store
+.env
+.env.local
+*.log
