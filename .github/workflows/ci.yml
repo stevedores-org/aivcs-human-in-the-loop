@@ -127,13 +127,44 @@ jobs:
             gitleaks detect --no-banner --redact
           fi
 
+      - name: Install Kustomize
+        uses: imranismail/setup-kustomize@v2
+
+      - name: Install Kubeconform
+        run: |
+          set -euo pipefail
+          curl -fsSL -o /tmp/kubeconform.tar.gz \
+            "https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz"
+          tar -xzf /tmp/kubeconform.tar.gz -C /tmp kubeconform
+          sudo mv /tmp/kubeconform /usr/local/bin/kubeconform
+          kubeconform -v
+
+      - name: Kubeconform Validation
+        run: |
+          set -euo pipefail
+          for overlay in k8s/overlays/*/; do
+            echo "==> kubeconform $overlay"
+            kustomize build "$overlay" | kubeconform -strict -ignore-missing-schemas -summary -
+          done
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: k8s/
+          config_file: .checkov.yaml
+
+      - name: Run Actionlint
+        uses: raven-actions/actionlint@v2
+        with:
+          flags: "-color"
+
       - name: Summary
         if: always()
         run: |
           {
             echo "### local-ci Summary"
             echo ""
-            echo "Stages: typecheck, lint, test, build, gitleaks (pinned ${GITLEAKS_VERSION})."
+            echo "Stages: typecheck, lint, test, build, gitleaks (pinned ${GITLEAKS_VERSION}), kubeconform, checkov, actionlint."
             echo ""
             echo "Bun + Vite stages stay no-op until Step A (#4) lands package.json."
           } >> "$GITHUB_STEP_SUMMARY"

@@ -47,3 +47,18 @@ watch = ["**/*.ts", "**/*.tsx", "**/*.css", "**/*.html", "vite.config.*", "tscon
 # `--no-banner --redact` keeps the output noise-free and the redactor on.
 command = ["gitleaks", "detect", "--no-banner", "--redact"]
 timeout = 60
+
+[stages.actionlint]
+command = ["actionlint"]
+timeout = 60
+watch = [".github/workflows/*.yml"]
+
+[stages.checkov]
+command = ["checkov", "-d", "k8s/", "--config-file", ".checkov.yaml", "--quiet"]
+timeout = 60
+watch = ["k8s/**/*.yaml"]
+
+[stages.kubeconform]
+command = ["bash", "-c", "set -e; for overlay in k8s/overlays/*/; do kustomize build \"$overlay\" | kubeconform -strict -ignore-missing-schemas -summary -; done"]
+timeout = 60
+watch = ["k8s/**/*.yaml"]
