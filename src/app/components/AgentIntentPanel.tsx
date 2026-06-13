@@ -7,7 +7,7 @@ interface AgentIntentPanelProps {
   intentThread: IntentThread | null;
   isLoading: boolean;
   error: Error | null;
-  onAddComment: (body: string) => Promise<any>;
+  onAddComment: (body: string) => Promise<void>;
   isAddingComment: boolean;
 }
 

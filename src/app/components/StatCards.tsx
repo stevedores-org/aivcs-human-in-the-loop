@@ -4,7 +4,7 @@ export interface StatCardItem {
   label: string;
   value: string;
   sub: string;
-  icon: React.ComponentType<any>;
+  icon: React.ElementType;
   color: string;
   bg: string;
   border: string;
