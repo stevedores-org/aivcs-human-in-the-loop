@@ -17,38 +17,38 @@ optional = ["bun", "actionlint", "yamllint", "shellcheck"]
 
 [stages.typecheck]
 # tsc via Bun. Runs from package.json `tsc` devDep once Step A (#4) lands.
-cmd = ["bun", "run", "tsc", "--noEmit"]
+command = ["bun", "run", "tsc", "--noEmit"]
 timeout = 180
-enabled = true
 watch = ["**/*.ts", "**/*.tsx", "tsconfig*.json", "package.json"]
+enabled = true
 
 [stages.lint]
-# ESLint via Bun. Forward-compatible shell wrapper matching CI.
-cmd = ["sh", "-c", 'if grep -q "\"eslint\"" package.json || ls eslint.config.* .eslintrc.* >/dev/null 2>&1; then bun run eslint .; else echo "skip: eslint not configured yet"; fi']
+# ESLint via Bun. Config lands in Step A (#4).
+command = ["bun", "run", "eslint", "."]
 depends_on = ["typecheck"]
 timeout = 120
-enabled = true
 watch = ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "eslint.config.*", ".eslintrc.*", "package.json"]
+enabled = true
 
 [stages.test]
-# Bun's built-in test runner. Forward-compatible shell wrapper matching CI.
-cmd = ["sh", "-c", 'if find . -path ./node_modules -prune -o \( -name "*.test.*" -o -name "*.spec.*" -o -name "*_test_*" -o -name "*_spec_*" \) -print -quit | grep -q .; then bun test; else echo "skip: no test files yet"; fi']
+# Bun's built-in test runner. Unit tests land alongside Step A (#4).
+command = ["bun", "test"]
 depends_on = ["typecheck"]
 timeout = 300
-enabled = true
 watch = ["**/*.ts", "**/*.tsx", "**/*.test.*", "**/*.spec.*", "package.json"]
+enabled = true
 
 [stages.build]
 # Vite production build via Bun. `vite build` script lands in Step A (#4).
-cmd = ["bun", "run", "build"]
+command = ["bun", "run", "build"]
 depends_on = ["typecheck", "lint"]
 timeout = 300
-enabled = true
 watch = ["**/*.ts", "**/*.tsx", "**/*.css", "**/*.html", "vite.config.*", "tsconfig*.json", "package.json", "index.html"]
+enabled = true
 
 [stages.gitleaks]
 # Pinned via .github/workflows/ci.yml; local users get whatever is on PATH.
 # `--no-banner --redact` keeps the output noise-free and the redactor on.
-cmd = ["gitleaks", "detect", "--no-banner", "--redact"]
+command = ["gitleaks", "detect", "--no-banner", "--redact"]
 timeout = 60
 enabled = true
