@@ -46,7 +46,7 @@ bun run typecheck
 
 ## Status
 
-This scaffold landed from a Figma-Make export ([#1](https://github.com/stevedores-org/aivcs-human-in-the-loop/issues/1)). All components render with mock data. The mock-to-API wiring lands in [#8](https://github.com/stevedores-org/aivcs-human-in-the-loop/issues/8).
+This scaffold landed from a Figma-Make export. The design source-of-truth — Figma mockup + a screenshot — lives in [#1](https://github.com/stevedores-org/aivcs-human-in-the-loop/issues/1); intentionally not committed to keep clone size small. All components render with mock data. The mock-to-API wiring lands in [#8](https://github.com/stevedores-org/aivcs-human-in-the-loop/issues/8).
 
 ## Branching
 

@@ -115,7 +115,11 @@ export function AgentIntentPanel({
             Agent Intent
           </span>
         </div>
-        <button className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+        <button
+          type="button"
+          aria-label="Open intent thread in full view"
+          className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+        >
           <ExternalLink size={11} />
         </button>
       </div>
@@ -145,7 +149,7 @@ export function AgentIntentPanel({
           intentThread?.thread.map((comment, i) => {
             const meta = resolveMessageMeta(comment);
             return (
-              <div key={i} className="flex gap-2">
+              <div key={`${comment.role}-${comment.at}-${i}`} className="flex gap-2">
                 <div
                   className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5"
                   style={{
@@ -237,8 +241,8 @@ export function AgentIntentPanel({
             Agent Guidance
           </span>
         </div>
-        {guidance.map((item, i) => (
-          <div key={i} className="flex items-start gap-1.5 py-0.5 group cursor-pointer">
+        {guidance.map((item) => (
+          <div key={item} className="flex items-start gap-1.5 py-0.5 group cursor-pointer">
             <ChevronRight
               size={10}
               className="text-muted-foreground mt-0.5 group-hover:text-primary transition-colors shrink-0"

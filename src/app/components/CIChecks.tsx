@@ -173,7 +173,7 @@ export function CIChecks({
             recentActivities.map((item, i) => {
               const { avatar, color } = resolveActorColorAndAvatar(item.actor);
               return (
-                <div key={i} className="flex items-center gap-2">
+                <div key={item.id} className="flex items-center gap-2">
                   <div
                     className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 border"
                     style={{
