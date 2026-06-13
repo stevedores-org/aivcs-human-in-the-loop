@@ -47,4 +47,4 @@ This scaffold landed from a Figma-Make export. The design source-of-truth — Fi
 
 ## Branching
 
-PRs base on `develop`. `develop → staging → main`. See [AGENTS.md](./AGENTS.md) (lands in [#5](https://github.com/stevedores-org/aivcs-human-in-the-loop/issues/5)).
+PRs base on `develop`. `develop → staging → main`. `AGENTS.md` lands in [#5](https://github.com/stevedores-org/aivcs-human-in-the-loop/issues/5).
