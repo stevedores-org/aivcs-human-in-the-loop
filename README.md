@@ -2,6 +2,9 @@
 
 Human-in-the-loop UI for [aivcs](https://github.com/stevedores-org/aivcs) — the AI Agent Version Control System.
 
+> [!NOTE]
+> Looking for instructions on how to set up, build, typecheck, or deploy the project locally? Check out the [Developer Guide](./DEVELOPER_GUIDE.md).
+
 Surfaces agent branches, PR diffs, agent intent threads, CI checks, and the append-only audit trail to humans who review agent PRs.
 
 Tracker: [#2](https://github.com/stevedores-org/aivcs-human-in-the-loop/issues/2).
@@ -46,7 +49,7 @@ bun run typecheck
 
 ## Status
 
-This scaffold landed from a Figma-Make export ([#1](https://github.com/stevedores-org/aivcs-human-in-the-loop/issues/1)). All components render with mock data. The mock-to-API wiring lands in [#8](https://github.com/stevedores-org/aivcs-human-in-the-loop/issues/8).
+This scaffold landed from a Figma-Make export. The design source-of-truth — Figma mockup + a screenshot — lives in [#1](https://github.com/stevedores-org/aivcs-human-in-the-loop/issues/1); intentionally not committed to keep clone size small. All components render with mock data. The mock-to-API wiring lands in [#8](https://github.com/stevedores-org/aivcs-human-in-the-loop/issues/8).
 
 ## Branching
 
