@@ -1,0 +1,171 @@
+# OCI build & publish via dockworker.ai
+#
+# Canonical manifest: dockworker.toml (OCI spec 1.0, engine = "nix").
+# No Dockerfile, Docker daemon, or buildx — CI materializes the image with
+# `nix build .#<nix_output>` and pushes to GAR with skopeo.
+#
+# Triggers:
+#   - push to `develop`  -> tags: develop, sha-<short>
+#   - push to tag `v*`   -> tags: <semver>, latest, sha-<short>
+#
+# Required repo secrets (synced from GCP Secret Manager in gcp-lornu-ai):
+#   - GCP_WIF_PROVIDER
+#   - GCP_WIF_SERVICE_ACCOUNT
+
+name: oci-build
+
+on:
+  push:
+    branches: [develop]
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: oci-build-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build:
+    name: dockworker OCI build & push
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v5.0.0
+
+      - name: Validate dockworker.toml
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import sys
+          import tomllib
+
+          with open("dockworker.toml", "rb") as f:
+              cfg = tomllib.load(f)
+
+          assert cfg["oci"]["spec"] == "1.0", "oci.spec must be 1.0"
+          assert cfg["oci"]["builder"] == "nix", "oci.builder must be nix"
+          assert cfg["build"]["engine"] == "nix", "build.engine must be nix"
+          assert "nix_output" in cfg["oci"], "oci.nix_output is required"
+          assert cfg["registry"]["url"], "registry.url is required"
+          assert cfg["registry"]["name"], "registry.name is required"
+          print("dockworker.toml OK")
+          print(f"  package: {cfg['package']['name']}")
+          print(f"  nix_output: {cfg['oci']['nix_output']}")
+          print(f"  registry: {cfg['registry']['url']}/{cfg['registry']['name']}")
+          PY
+
+      - name: Load dockworker manifest
+        id: manifest
+        run: |
+          set -euo pipefail
+          python3 <<'PY' >> "$GITHUB_OUTPUT"
+          import tomllib
+
+          with open("dockworker.toml", "rb") as f:
+              cfg = tomllib.load(f)
+
+          registry_url = cfg["registry"]["url"].rstrip("/")
+          image_name = cfg["registry"]["name"]
+          nix_output = cfg["oci"]["nix_output"]
+          install_cmd = cfg["build"]["install"]
+          build_cmd = cfg["build"]["build"]
+
+          # us-central1-docker.pkg.dev/gcp-lornu-ai/lornu
+          host, _, path = registry_url.partition("/")
+          region, _, _ = host.partition("-docker.pkg.dev")
+          project, repo = path.split("/", 1)
+
+          print(f"nix_output={nix_output}")
+          print(f"install_cmd={install_cmd}")
+          print(f"build_cmd={build_cmd}")
+          print(f"gar_host={host}")
+          print(f"gcp_region={region}")
+          print(f"gcp_project={project}")
+          print(f"gar_repo={repo}")
+          print(f"image_name={image_name}")
+          print(f"gar_image={registry_url}/{image_name}")
+          PY
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v1.2.2
+        with:
+          bun-version: latest
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@ba0dd844c9180cbf77aa72a116d6fbc515d0e87b # v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_WIF_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_lifetime: 1800s
+
+      - name: Configure skopeo policy
+        run: |
+          mkdir -p ~/.config/containers
+          echo '{"default":[{"type":"insecureAcceptAnything"}]}' > ~/.config/containers/policy.json
+          echo 'unqualified-search-registries = ["docker.io"]' > ~/.config/containers/registries.conf
+
+      - name: Build frontend assets (dockworker build phase)
+        run: |
+          set -euo pipefail
+          ${{ steps.manifest.outputs.install_cmd }}
+          ${{ steps.manifest.outputs.build_cmd }}
+          # Fail fast if Vite did not produce a production bundle (dev index.html
+          # references /src/main.tsx and breaks in the browser with MIME errors).
+          test -f dist/index.html
+          grep -q '/assets/' dist/index.html
+          ! grep -q '/src/main' dist/index.html
+          test -n "$(find dist/assets -name '*.js' -print -quit)"
+          echo "Vite production bundle OK ($(find dist/assets -name '*.js' | wc -l) JS chunks)"
+
+      - name: Build OCI image (dockworker + nix)
+        env:
+          NIX_HITL_DIST: ${{ github.workspace }}/dist
+        run: |
+          set -euo pipefail
+          nix build ".#${{ steps.manifest.outputs.nix_output }}" -L --impure
+          ls -lh result
+
+      - name: Compute image tags
+        id: meta
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          TAGS=("sha-${SHORT_SHA}")
+          if [ "${GITHUB_REF}" = "refs/heads/develop" ]; then
+            TAGS+=("develop")
+          fi
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            TAGS+=("latest")
+            TAGS+=("${GITHUB_REF_NAME#v}")
+          fi
+          printf '%s\n' "${TAGS[@]}" > tags.txt
+          echo "tags<<EOF" >> "$GITHUB_OUTPUT"
+          cat tags.txt >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Push to GAR (dockworker registry)
+        env:
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          GAR_IMAGE: ${{ steps.manifest.outputs.gar_image }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            echo "Pushing ${GAR_IMAGE}:${tag}"
+            nix shell nixpkgs#skopeo -c skopeo copy \
+              --dest-creds="oauth2accesstoken:${ACCESS_TOKEN}" \
+              docker-archive:result \
+              "docker://${GAR_IMAGE}:${tag}"
+          done < tags.txt
+          echo "Pushed ${GAR_IMAGE} ($(tr '\n' ' ' < tags.txt))"

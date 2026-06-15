@@ -1,0 +1,54 @@
+# local-ci configuration for stevedores-org/aivcs-human-in-the-loop.
+# Mirrors .github/workflows/ci.yml so a green local-ci run means a green CI.
+# Binary: stevedores-org/local-ci. See AGENTS.md §5.
+#
+# Forward-compat: package.json / tsconfig.json / eslint config land in Step A
+# (#4). Until then, the `bun` dependency in [dependencies.optional] keeps
+# local-ci from hard-failing on a fresh checkout — stages whose inputs are
+# absent will surface as a no-op-shaped failure that's easy to skip.
+
+[cache]
+skip_dirs = [".git", ".github", ".local-ci-cache", "node_modules", "dist", "build", "coverage", ".turbo", ".vite"]
+include_patterns = ["*.toml", "*.yaml", "*.yml", "*.md", "*.sh", "*.json", "*.ts", "*.tsx", "*.js", "*.jsx", "*.mjs", "*.cjs", "*.css", "*.html"]
+
+[dependencies]
+required = ["gitleaks"]
+optional = ["bun", "actionlint", "yamllint", "shellcheck"]
+
+[stages.typecheck]
+# tsc via Bun. Runs from package.json `tsc` devDep once Step A (#4) lands.
+command = ["bun", "run", "tsc", "--noEmit"]
+timeout = 180
+watch = ["**/*.ts", "**/*.tsx", "tsconfig*.json", "package.json"]
+enabled = true
+
+[stages.lint]
+# ESLint via Bun. Config lands in Step A (#4).
+command = ["bun", "run", "eslint", "."]
+depends_on = ["typecheck"]
+timeout = 120
+watch = ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "eslint.config.*", ".eslintrc.*", "package.json"]
+enabled = true
+
+[stages.test]
+# Bun's built-in test runner. Unit tests land alongside Step A (#4).
+command = ["bun", "test"]
+depends_on = ["typecheck"]
+timeout = 300
+watch = ["**/*.ts", "**/*.tsx", "**/*.test.*", "**/*.spec.*", "package.json"]
+enabled = true
+
+[stages.build]
+# Vite production build via Bun. `vite build` script lands in Step A (#4).
+command = ["bun", "run", "build"]
+depends_on = ["typecheck", "lint"]
+timeout = 300
+watch = ["**/*.ts", "**/*.tsx", "**/*.css", "**/*.html", "vite.config.*", "tsconfig*.json", "package.json", "index.html"]
+enabled = true
+
+[stages.gitleaks]
+# Pinned via .github/workflows/ci.yml; local users get whatever is on PATH.
+# `--no-banner --redact` keeps the output noise-free and the redactor on.
+command = ["gitleaks", "detect", "--no-banner", "--redact"]
+timeout = 60
+enabled = true

@@ -1,0 +1,140 @@
+name: CI
+
+# Single `local-ci` job. Mirrors `.local-ci.toml` so a green local-ci run
+# locally means a green CI here. Conventional-Commits PR-title enforcement
+# lives in pr-title.yml. Path-based labels live in pr-labeler.yml.
+#
+# Forward-compat: package.json / tsconfig.json land in Step A (#4). Until
+# they do, `bun install` is a no-op and the tsc/eslint/test/build stages
+# surface as no-op-shaped failures the operator can `--skip` on a
+# documented basis. Once #4 lands, every stage is real.
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  local-ci:
+    # NOTE: this job name is the required status check pinned by
+    # scripts/bootstrap-branch-protection.sh. Do not rename without
+    # updating that script and re-pinning the check in repo settings.
+    name: local-ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      # Pinned gitleaks release. Bump deliberately; the binary is the
+      # secret-scan source of truth and we do not want auto-updates here.
+      GITLEAKS_VERSION: v8.30.1
+
+    steps:
+      - name: Checkout
+        # actions/checkout v5
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          # full history so gitleaks can scan the diff against the base
+          fetch-depth: 0
+
+      - name: Setup Bun
+        # oven-sh/setup-bun v1.2.2 — pinned by SHA, not tag. Bump
+        # deliberately when oven-sh ships a new release.
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: latest
+
+      - name: Install gitleaks (pinned release asset)
+        run: |
+          set -euo pipefail
+          version="${GITLEAKS_VERSION#v}"
+          curl -fsSL -o /tmp/gitleaks.tar.gz \
+            "https://github.com/gitleaks/gitleaks/releases/download/${GITLEAKS_VERSION}/gitleaks_${version}_linux_x64.tar.gz"
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          sudo mv /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Install dependencies (Bun)
+        # `bun install` is a no-op until package.json lands in Step A (#4);
+        # `--frozen-lockfile` errors only if bun.lock / bun.lockb is out of
+        # sync. Dependabot npm PRs get bun.lock refreshed by
+        # dependabot-bun-lockfile.yml before the next CI run.
+        run: |
+          set -euo pipefail
+          if [ -f package.json ]; then
+            bun install --frozen-lockfile
+          else
+            echo "skip: package.json not present (Step A / #4)"
+          fi
+
+      - name: Typecheck
+        # Forward-compat: succeeds trivially until Step A (#4) ships
+        # tsconfig + package.json with a tsc devDep.
+        run: |
+          set -euo pipefail
+          if [ -f tsconfig.json ] && [ -f package.json ]; then
+            bun run tsc --noEmit
+          else
+            echo "skip: tsconfig.json or package.json not present (Step A / #4)"
+          fi
+
+      - name: Lint
+        run: |
+          set -euo pipefail
+          if [ ! -f package.json ]; then
+            echo "skip: package.json not present (Step A / #4)"
+          elif grep -q '"eslint"' package.json || compgen -G 'eslint.config.*' >/dev/null || compgen -G '.eslintrc.*' >/dev/null; then
+            bun run eslint .
+          else
+            echo "skip: eslint not configured yet"
+          fi
+
+      - name: Test
+        run: |
+          set -euo pipefail
+          if [ ! -f package.json ]; then
+            echo "skip: package.json not present (Step A / #4)"
+          elif find . -path ./node_modules -prune -o \( -name '*.test.*' -o -name '*.spec.*' -o -name '*_test_*' -o -name '*_spec_*' \) -print -quit | grep -q .; then
+            bun test
+          else
+            echo "skip: no test files yet"
+          fi
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          if [ -f package.json ]; then
+            bun run build
+          else
+            echo "skip: package.json not present (Step A / #4)"
+          fi
+
+      - name: Gitleaks
+        # Always run — even with an empty tree this is fast and the gate
+        # is the whole point. `--no-banner --redact` matches AGENTS.md §6.
+        run: |
+          set -euo pipefail
+          if [ -f .gitleaks.toml ]; then
+            gitleaks detect --no-banner --redact --config .gitleaks.toml
+          else
+            gitleaks detect --no-banner --redact
+          fi
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### local-ci Summary"
+            echo ""
+            echo "Stages: typecheck, lint, test, build, gitleaks (pinned ${GITLEAKS_VERSION})."
+            echo ""
+            echo "Bun + Vite stages stay no-op until Step A (#4) lands package.json."
+          } >> "$GITHUB_STEP_SUMMARY"

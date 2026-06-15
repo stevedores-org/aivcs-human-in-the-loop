@@ -1,0 +1,22 @@
+name: PR labeler
+
+# Apply labels based on which paths the PR touches. Keeps the "what kind
+# of change is this" question answerable at a glance.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      # actions/labeler v6.0.1
+      - uses: actions/labeler@f27b608878404679385c85cfa523b85ccb86e213
+        with:
+          configuration-path: .github/labeler.yml
+          sync-labels: true

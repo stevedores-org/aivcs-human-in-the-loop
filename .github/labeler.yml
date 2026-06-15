@@ -1,0 +1,44 @@
+# actions/labeler v6 configuration.
+# Each label maps to a list of any/all match rules using changed-files
+# glob patterns. `sync-labels: true` in the workflow removes labels that
+# no longer match.
+#
+# Label namespaces:
+#   area/* — which surface the change touches
+#   dependencies — dependabot ownership
+
+"area/ci":
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/workflows/**'
+          - '.github/labeler.yml'
+          - '.github/dependabot.yml'
+          - '.local-ci.toml'
+          - '.gitleaks.toml'
+          - 'scripts/**'
+
+"area/k8s":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'k8s/**'
+          - 'dockworker.toml'
+
+"area/docs":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**'
+          - 'README.md'
+          - 'AGENTS.md'
+          - 'CLAUDE.md'
+          - '.cursorrules'
+
+"area/ui":
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'src/**'
+          - 'public/**'
+          - 'index.html'
+          - 'vite.config.*'
+          - 'tsconfig*.json'
+          - 'package.json'
+          - 'bun.lockb'

@@ -1,0 +1,121 @@
+# aivcs-human-in-the-loop
+
+Human-in-the-loop UI for [aivcs](https://github.com/stevedores-org/aivcs) — the AI Agent Version Control System.
+
+> [!NOTE]
+> Looking for instructions on how to set up, build, typecheck, or deploy the project locally? Check out the [Developer Guide](./DEVELOPER_GUIDE.md).
+
+Surfaces agent branches, PR diffs, agent intent threads, CI checks, and the append-only audit trail to humans who review agent PRs.
+
+Tracker: [#2](https://github.com/stevedores-org/aivcs-human-in-the-loop/issues/2).
+
+## Architecture
+
+```
+┌────────────────────────────────────┐
+│ aivcs-human-in-the-loop  (this)    │   Vite + React + TS + shadcn/ui
+│   bun build → OCI (dockworker)     │
+└────────────────┬───────────────────┘
+                 │ HTTPS, Lornu SSO JWT
+                 ▼
+┌────────────────────────────────────┐
+│ stevedores-org/aivcs-api           │   TS + Bun + Hono
+│   facade, auth, rate limiting      │
+└────────────────┬───────────────────┘
+                 │ service-binding token
+                 ▼
+┌────────────────────────────────────┐
+│ lornu-ai/lornu-ai-data-fabric      │   Cloudflare Worker + D1
+│   commits, branches, events        │
+└────────────────────────────────────┘
+```
+
+## Stack
+
+- **Frontend:** Vite + React 18 + TypeScript + Tailwind 4 + shadcn/ui (Radix primitives)
+- **Runtime:** Bun (>= 1.1)
+- **Build:** React + Vite (TypeScript) → static bundle in `dist/` → OCI via **dockworker.ai** + Caddy (no Dockerfile)
+- **Deploy:** Kubernetes via Kustomize + Flux + Gateway API (Lornu standard; no Helm)
+
+## Local dev
+
+```bash
+bun install
+bun run dev          # http://localhost:5173 (Vite dev server)
+bun run build        # production bundle → dist/
+bun run preview      # preview production build locally
+bun run typecheck
+```
+
+## Status
+
+This scaffold landed from a Figma-Make export. The design source-of-truth — Figma mockup + a screenshot — lives in [#1](https://github.com/stevedores-org/aivcs-human-in-the-loop/issues/1); intentionally not committed to keep clone size small. All components render with mock data. The mock-to-API wiring lands in [#8](https://github.com/stevedores-org/aivcs-human-in-the-loop/issues/8).
+
+## Branching
+
+PRs base on `develop`. See [AGENTS.md](./AGENTS.md).
+
+## Deploy
+
+### Image
+
+OCI images are built and pushed by `.github/workflows/oci-build.yml` using the
+[dockworker.ai](https://dockworker.ai) OCI standard — **no Dockerfile**:
+
+1. Validate and load [`dockworker.toml`](./dockworker.toml) (canonical manifest)
+2. Run the dockworker build phase (`bun install`, `bun run build` → Vite bundles React/TS to `dist/assets/*`)
+3. `nix build .#oci` packages `dist/` with Caddy (same SPA serving pattern as [inertsynergies.com](https://www.inertsynergies.com))
+4. `skopeo copy` pushes to the registry declared in `dockworker.toml`
+
+- push to `develop` → `us-central1-docker.pkg.dev/gcp-lornu-ai/lornu/aivcs-human-in-the-loop:develop`
+- push to tag `v*`  → same repo with semver + `latest`
+
+Nix derivation: [`flake.nix`](./flake.nix) (`packages.oci`, referenced by `oci.nix_output`).
+
+GitHub Actions auth uses OIDC via repo secrets synced from GCP Secret Manager
+(`GCP_WIF_PROVIDER`, `GCP_WIF_SERVICE_ACCOUNT` in project `gcp-lornu-ai`).
+
+### k8s layout
+
+```
+k8s/
+  base/
+    deployment.yaml         # Deployment, 1 replica, non-root, RO rootfs
+    service.yaml            # ClusterIP :80 -> container :3000
+    httproute.yaml          # Gateway API HTTPRoute (placeholder hostname)
+    kustomization.yaml
+  overlays/
+    dev/                    # namespace: aivcs-hitl-dev
+      kustomization.yaml    # image tag: develop, ConfigMap, HTTPRoute patch
+      httproute-patch.yaml  # hostname: aivcs-hitl.dev.lornu.ai
+    prod/                   # namespace: aivcs-hitl-prod
+      kustomization.yaml    # image tag: latest (via Flux automation), replicas: 3
+      httproute-patch.yaml  # hostname: aivcs-hitl.lornu.ai
+```
+
+Runtime secrets (session signing, API tokens) will land via External Secrets Operator in a follow-up once upstream keys exist in `gcp-secret-manager` (ClusterSecretStore `gcp-secret-manager` on GKE).
+
+Flux deploy manifests for `lornu-gke-prod` live in [lornu-ai/lornu.ai](https://github.com/lornu-ai/lornu.ai/tree/develop/crossplane/gcp/hub/spoke/apps/aivcs-hitl).
+
+### Env var sources
+
+| Var             | Source                                                                  |
+|-----------------|-------------------------------------------------------------------------|
+| `AIVCS_API_URL` | per-env `ConfigMap` `aivcs-hitl-config` (generated by overlay)          |
+| `SSO_ISSUER`    | per-env `ConfigMap` `aivcs-hitl-config` (generated by overlay)          |
+| (future secrets)| `Secret` via ExternalSecret from `lornu-secrets` (follow-up PR)         |
+
+### Render locally
+
+```sh
+kustomize build k8s/overlays/dev
+kustomize build k8s/overlays/prod
+```
+
+### Flux wiring
+
+The Flux `Kustomization` CRs that reconcile `k8s/overlays/dev` and `k8s/overlays/prod` into the dev / prod fleets live in [`lornu-ai/infra-code`](https://github.com/lornu-ai/infra-code) — **not in this repo**.
+
+## License
+
+Apache-2.0. See [LICENSE](./LICENSE).

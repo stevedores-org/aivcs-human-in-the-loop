@@ -1,0 +1,81 @@
+# dockworker.toml - OCI Standard manifest for aivcs-human-in-the-loop
+#
+# Canonical packaging surface for dockworker.ai. No Dockerfile — CI materializes
+# this manifest with `nix build .#oci` (see flake.nix) and pushes to GAR via skopeo.
+
+[package]
+name = "aivcs-human-in-the-loop"
+version = "0.1.0"
+description = "Human-in-the-loop UI for the agent-driven VCS (aivcs)"
+runtime = "bun"
+
+[oci]
+spec = "1.0"
+builder = "nix"
+nix_output = "oci"
+
+[oci.image]
+authors = ["Stevedores Org <engineering@stevedores.org>"]
+url = "https://github.com/stevedores-org/aivcs-human-in-the-loop"
+source = "https://github.com/stevedores-org/aivcs-human-in-the-loop"
+vendor = "stevedores-org"
+licenses = "Apache-2.0"
+title = "aivcs-human-in-the-loop"
+
+[oci.image.labels]
+"lornu.ai/component" = "aivcs-human-in-the-loop"
+"lornu.ai/managed-by" = "dockworker"
+"lornu.ai/runtime" = "caddy"
+"lornu.ai/team" = "platform"
+"lornu.ai/kind" = "frontend-spa"
+
+[oci.config]
+user = "65532:65532"
+workdir = "/srv"
+entrypoint = ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
+expose = ["3000/tcp"]
+stop_signal = "SIGTERM"
+
+[oci.config.env]
+NODE_ENV = "production"
+# AIVCS_API_URL and SSO_ISSUER are injected at runtime via k8s overlay
+# ConfigMaps (aivcs-hitl-config), not baked into the image.
+
+[build]
+runtime = "bun"
+engine = "nix"
+install = "bun install --frozen-lockfile"
+build = "bun run build"
+
+[build.output]
+include = ["dist/**"]
+exclude = ["node_modules", "src", ".git"]
+
+[oci.platforms]
+architectures = ["amd64"]
+
+[oci.security]
+user = 65532
+group = 65532
+read_only_rootfs = true
+no_new_privileges = true
+drop_capabilities = ["ALL"]
+
+[oci.sbom]
+enabled = true
+format = "spdx-json"
+
+[oci.signing]
+enabled = false
+provider = "sigstore"
+keyless = true
+
+[registry]
+url = "us-central1-docker.pkg.dev/gcp-lornu-ai/lornu"
+name = "aivcs-human-in-the-loop"
+tags = ["develop", "latest"]
+
+[deploy]
+targets = ["kubernetes"]
+namespace = "aivcs-hitl-dev"
+replicas = 1

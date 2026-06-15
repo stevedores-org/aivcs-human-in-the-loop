@@ -1,0 +1,41 @@
+version: 2
+updates:
+  # Pin GitHub Actions versions and pull weekly updates.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:30'
+      timezone: Etc/UTC
+    target-branch: develop
+    open-pull-requests-limit: 5
+    labels:
+      - area/ci
+      - dependencies
+    commit-message:
+      prefix: chore(deps)
+
+  # npm ecosystem covers Bun's package.json once Step A (#4) lands. Bun
+  # reads package.json and uses the npm registry; dependabot has no Bun-
+  # specific ecosystem yet. `.github/workflows/dependabot-bun-lockfile.yml`
+  # regenerates `bun.lock` on each npm dependabot PR so frozen-lockfile CI passes.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:35'
+      timezone: Etc/UTC
+    target-branch: develop
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+    commit-message:
+      prefix: chore(deps)
+    versioning-strategy: increase
+    ignore:
+      # Major bumps need human review; let dependabot stay in
+      # minor + patch lane.
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
