@@ -18,6 +18,7 @@ import {
   mockIntentThreads,
   mockCIChecks,
   mockActivity,
+  mockDb,
 } from "./mocks";
 
 // Helper to determine if we should run in mock mode.
@@ -73,7 +74,11 @@ const apiFetch = async <T>(path: string, options: RequestInit = {}): Promise<T> 
 
 // In-memory or localStorage cache for mock intent threads to make mutations work in mock mode.
 const getMockIntentThread = (prId: string): IntentThread => {
-  const key = `mock_thread_${prId}`;
+  const actualPrId = (prId === "379" && !mockDb.pullRequests["379"] && mockDb.branches.length > 0)
+    ? mockDb.branches[0].id
+    : prId;
+
+  const key = `mock_thread_${actualPrId}`;
   const stored = localStorage.getItem(key);
   if (stored) {
     try {
@@ -82,11 +87,14 @@ const getMockIntentThread = (prId: string): IntentThread => {
       // Fallback if parsing failed
     }
   }
-  return mockIntentThreads[prId] || { thread: [] };
+  return mockDb.intentThreads[actualPrId] || mockIntentThreads[actualPrId] || { thread: [] };
 };
 
 const saveMockIntentThread = (prId: string, thread: IntentThread) => {
-  localStorage.setItem(`mock_thread_${prId}`, JSON.stringify(thread));
+  const actualPrId = (prId === "379" && !mockDb.pullRequests["379"] && mockDb.branches.length > 0)
+    ? mockDb.branches[0].id
+    : prId;
+  localStorage.setItem(`mock_thread_${actualPrId}`, JSON.stringify(thread));
 };
 
 export interface HookResult<T> {
@@ -112,12 +120,12 @@ export function useBranches(): HookResult<Branch[]> {
     setError(null);
 
     if (shouldUseMocks()) {
-      // Simulate network latency
-      const timer = setTimeout(() => {
-        setData(mockBranches);
+      const updateData = () => {
+        setData(mockDb.branches.length > 0 ? mockDb.branches : mockBranches);
         setIsLoading(false);
-      }, 300);
-      return () => clearTimeout(timer);
+      };
+      updateData();
+      return mockDb.subscribe(updateData);
     } else {
       apiFetch<{ branches: Branch[] }>("/branches")
         .then((res) => {
@@ -151,12 +159,15 @@ export function usePullRequest(id: string): HookResult<PullRequest> {
     setError(null);
 
     if (shouldUseMocks()) {
-      const timer = setTimeout(() => {
-        const mock = mockPullRequests[id];
+      const updateData = () => {
+        const actualId = (id === "379" && !mockDb.pullRequests["379"] && mockDb.branches.length > 0)
+          ? mockDb.branches[0].id
+          : id;
+
+        const mock = mockDb.pullRequests[actualId] || mockPullRequests[actualId];
         if (mock) {
           setData(mock);
         } else {
-          // Dynamic fallback for any other ID
           setData({
             id,
             number: Number.parseInt(id, 10) || 379,
@@ -169,8 +180,9 @@ export function usePullRequest(id: string): HookResult<PullRequest> {
           });
         }
         setIsLoading(false);
-      }, 200);
-      return () => clearTimeout(timer);
+      };
+      updateData();
+      return mockDb.subscribe(updateData);
     } else {
       apiFetch<PullRequest>(`/pull-requests/${id}`)
         .then((res) => {
@@ -204,11 +216,15 @@ export function usePullRequestDiff(id: string): HookResult<PullRequestDiff> {
     setError(null);
 
     if (shouldUseMocks()) {
-      const timer = setTimeout(() => {
-        setData(mockDiffs[id] || { files: [] });
+      const updateData = () => {
+        const actualId = (id === "379" && !mockDb.pullRequests["379"] && mockDb.branches.length > 0)
+          ? mockDb.branches[0].id
+          : id;
+        setData(mockDb.diffs[actualId] || mockDiffs[actualId] || { files: [] });
         setIsLoading(false);
-      }, 250);
-      return () => clearTimeout(timer);
+      };
+      updateData();
+      return mockDb.subscribe(updateData);
     } else {
       apiFetch<PullRequestDiff>(`/pull-requests/${id}/diff`)
         .then((res) => {
@@ -242,11 +258,12 @@ export function useAgentIntent(prId: string): HookResult<IntentThread> {
     setError(null);
 
     if (shouldUseMocks()) {
-      const timer = setTimeout(() => {
+      const updateData = () => {
         setData(getMockIntentThread(prId));
         setIsLoading(false);
-      }, 200);
-      return () => clearTimeout(timer);
+      };
+      updateData();
+      return mockDb.subscribe(updateData);
     } else {
       apiFetch<IntentThread>(`/pull-requests/${prId}/intent`)
         .then((res) => {
@@ -280,11 +297,15 @@ export function useCIChecks(prId: string): HookResult<CiCheck[]> {
     setError(null);
 
     if (shouldUseMocks()) {
-      const timer = setTimeout(() => {
-        setData(mockCIChecks[prId]?.checks || []);
+      const updateData = () => {
+        const actualId = (prId === "379" && !mockDb.pullRequests["379"] && mockDb.branches.length > 0)
+          ? mockDb.branches[0].id
+          : prId;
+        setData(mockDb.ciChecks[actualId]?.checks || mockCIChecks[actualId]?.checks || []);
         setIsLoading(false);
-      }, 200);
-      return () => clearTimeout(timer);
+      };
+      updateData();
+      return mockDb.subscribe(updateData);
     } else {
       apiFetch<CiChecksResponse>(`/pull-requests/${prId}/ci-checks`)
         .then((res) => {
@@ -325,16 +346,18 @@ export function useActivity(options: UseActivityOptions = {}): HookResult<Activi
     setError(null);
 
     if (shouldUseMocks()) {
-      const timer = setTimeout(() => {
+      const updateData = () => {
+        const activeActivity = mockDb.activity.length > 0 ? mockDb.activity : mockActivity;
         const start = cursor ? Number.parseInt(cursor, 10) : 0;
-        const end = Math.min(start + limit, mockActivity.length);
-        const items = mockActivity.slice(start, end);
-        const next_cursor = end < mockActivity.length ? String(end) : null;
+        const end = Math.min(start + limit, activeActivity.length);
+        const items = activeActivity.slice(start, end);
+        const next_cursor = end < activeActivity.length ? String(end) : null;
 
         setData({ items, next_cursor });
         setIsLoading(false);
-      }, 300);
-      return () => clearTimeout(timer);
+      };
+      updateData();
+      return mockDb.subscribe(updateData);
     } else {
       const queryParams = new URLSearchParams();
       queryParams.set("limit", String(limit));
