@@ -206,3 +206,179 @@ export const mockActivity: Activity[] = [
     summary: "Approved policy",
   },
 ];
+
+export class MockDatabase {
+  private loaded = false;
+  private listeners: (() => void)[] = [];
+
+  public branches: Branch[] = [];
+  public pullRequests: Record<string, PullRequest> = {};
+  public diffs: Record<string, PullRequestDiff> = {};
+  public intentThreads: Record<string, IntentThread> = {};
+  public ciChecks: Record<string, { checks: CiCheck[] }> = {};
+  public activity: Activity[] = [];
+
+  constructor() {
+    this.initialize();
+  }
+
+  public isLoaded() {
+    return this.loaded;
+  }
+
+  public subscribe(listener: () => void) {
+    this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== listener);
+    };
+  }
+
+  private notify() {
+    this.listeners.forEach((l) => l());
+  }
+
+  private async initialize() {
+    try {
+      const listRes = await fetch("/scenarios/scenarios.json");
+      if (!listRes.ok) throw new Error("no scenarios list");
+      const list = (await listRes.json()) as string[];
+
+      const scenarios = await Promise.all(
+        list.map(async (id) => {
+          const res = await fetch(`/scenarios/${id}/seed.json`);
+          if (!res.ok) throw new Error(`failed to load scenario ${id}`);
+          return res.json();
+        })
+      );
+
+      const branchesList: Branch[] = [];
+      const prs: Record<string, PullRequest> = {};
+      const diffsList: Record<string, PullRequestDiff> = {};
+      const intentsList: Record<string, IntentThread> = {};
+      const checksList: Record<string, { checks: CiCheck[] }> = {};
+      let activityList: Activity[] = [];
+
+      for (const scenario of scenarios) {
+        const pr = scenario.pull_request;
+        const prId = pr.id;
+
+        // Map branches
+        for (const b of scenario.branches) {
+          branchesList.push({
+            id: prId,
+            name: b.name,
+            head_sha: b.head_sha,
+            agent_owner: b.agent_owner,
+            status: "active",
+          });
+        }
+
+        // Map PullRequest
+        prs[prId] = {
+          id: prId,
+          number: pr.number,
+          title: pr.title,
+          base: pr.base,
+          head: pr.head,
+          status: pr.status,
+          agent_intent: pr.agent_intent,
+          ci_summary: pr.ci_summary,
+        };
+
+        // Stub/mock Diff
+        diffsList[prId] = {
+          files: [
+            {
+              path: "src/main.rs",
+              additions: 15,
+              deletions: 4,
+              patch: `@@ -1,8 +1,19 @@
+-fn main() {
+-    println!("Hello World");
+-}
++use tracing::{info, warn};
++
++#[tokio::main]
++async fn main() -> Result<(), Box<dyn std::error::Error>> {
++    tracing_subscriber::fmt::init();
++    info!("Initializing AIVCS Lornu Demo Adapter Service");
++
++    // Load private gateway routes for tenant: lornu
++    let route_config = load_gateway_route().await?;
++    info!(?route_config, "Gateway route successfully initialized");
++
++    Ok(())
++}`,
+            },
+          ],
+        };
+
+        // Intent Thread
+        intentsList[prId] = {
+          thread: [
+            {
+              role: "agent",
+              at: "2026-06-16T10:00:00Z",
+              body: pr.agent_intent,
+            },
+          ],
+        };
+
+        // CI Checks
+        checksList[prId] = {
+          checks: scenario.ci_checks.map((chk: any) => ({
+            name: chk.name,
+            status: chk.status,
+            conclusion: chk.conclusion,
+            url: chk.details_url || "#",
+          })),
+        };
+
+        // Map Audit Events to Activity
+        for (const evt of scenario.audit_events) {
+          let kind: any = "pr.commented";
+          if (evt.kind === "agent_run") kind = "pr.opened";
+          else if (evt.kind === "ci_check") {
+            kind = evt.summary.toLowerCase().includes("fail") ? "ci.failed" : "ci.passed";
+          } else if (evt.kind === "commit") kind = "branch.opened";
+          else if (evt.kind === "pr.merged") kind = "pr.merged";
+
+          activityList.push({
+            id: evt.id,
+            kind,
+            at: evt.at,
+            actor: evt.actor,
+            subject: pr.number ? `#${pr.number}` : prId,
+            summary: evt.summary,
+          });
+        }
+      }
+
+      // Sort activityList by time descending
+      activityList.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+
+      this.branches = branchesList;
+      this.pullRequests = prs;
+      this.diffs = diffsList;
+      this.intentThreads = intentsList;
+      this.ciChecks = checksList;
+      this.activity = activityList;
+
+      this.loaded = true;
+      this.notify();
+    } catch (err) {
+      console.warn("Failed to load dynamic scenarios, using static fallback mocks:", err);
+      this.branches = mockBranches;
+      this.pullRequests = mockPullRequests;
+      this.diffs = mockDiffs;
+      this.intentThreads = mockIntentThreads;
+      this.ciChecks = mockCIChecks;
+      this.activity = mockActivity;
+      this.loaded = true;
+      this.notify();
+    }
+  }
+}
+
+export const mockDb = new MockDatabase();
+
