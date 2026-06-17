@@ -377,7 +377,7 @@ export class MockDatabase {
             id: evt.id,
             kind,
             at: evt.at,
-            actor: evt.actor,
+            actor: evt.actor ?? "system",
             subject: pr.number ? `#${pr.number}` : prId,
             summary: evt.summary,
           });
