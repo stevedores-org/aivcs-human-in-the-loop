@@ -90,7 +90,6 @@
           buildInputs = with pkgs; [
             bun
             caddy
-            nodejs_22
             skopeo
           ];
         };
