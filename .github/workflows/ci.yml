@@ -65,7 +65,8 @@ jobs:
       - name: Install dependencies (Bun)
         # `bun install` is a no-op until package.json lands in Step A (#4);
         # `--frozen-lockfile` errors only if bun.lock / bun.lockb is out of
-        # sync. We tolerate both states explicitly.
+        # sync. Dependabot npm PRs get bun.lock refreshed by
+        # dependabot-bun-lockfile.yml before the next CI run.
         run: |
           set -euo pipefail
           if [ -f package.json ]; then
