@@ -131,6 +131,7 @@ bun run build
 ### Commits & Pull Requests
 * **Target Base:** All PRs must target the `develop` branch.
 * **Commit Message Standard:** We follow Conventional Commits (`type(scope?): description`). Avoid using emojis in commit messages or manifests.
+* **Dependabot npm PRs:** Dependabot updates `package.json` only; `.github/workflows/dependabot-bun-lockfile.yml` auto-commits `bun.lock` on those branches so `local-ci` frozen-lockfile install succeeds.
 
 ---
 
