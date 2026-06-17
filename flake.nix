@@ -50,6 +50,7 @@
               caddy
               cacert
               bash
+              coreutils
             ];
             extraCommands = ''
               mkdir -p srv etc/caddy tmp usr/local/bin

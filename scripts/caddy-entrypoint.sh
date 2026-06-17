@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 set -eu
 
 CONFIG_JSON="/tmp/config.json"
@@ -18,7 +18,7 @@ bool_json() {
   esac
 }
 
-> "$CONFIG_JSON" <<EOF
+cat > "$CONFIG_JSON" <<EOF
 {
   "apiUrl": "${AIVCS_API_URL}",
   "ssoIssuer": "${SSO_ISSUER}",
@@ -29,7 +29,7 @@ bool_json() {
 }
 EOF
 
-> "$CADDYFILE" <<'EOF'
+cat > "$CADDYFILE" <<'EOF'
 {
 	admin off
 	auto_https off
