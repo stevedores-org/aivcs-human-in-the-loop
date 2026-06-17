@@ -12,7 +12,7 @@
 #   - GCP_WIF_PROVIDER
 #   - GCP_WIF_SERVICE_ACCOUNT
 
-name: oci-build
+name: Build and Push OCI Image
 
 on:
   push:
@@ -29,8 +29,8 @@ permissions:
   id-token: write
 
 jobs:
-  build:
-    name: dockworker OCI build & push
+  build-and-push:
+    name: Build and Push OCI Image
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -115,18 +115,20 @@ jobs:
           echo '{"default":[{"type":"insecureAcceptAnything"}]}' > ~/.config/containers/policy.json
           echo 'unqualified-search-registries = ["docker.io"]' > ~/.config/containers/registries.conf
 
-      - name: Build frontend assets (dockworker build phase)
+      - name: CI Guard - Verify Production Bundle
         run: |
           set -euo pipefail
           ${{ steps.manifest.outputs.install_cmd }}
           ${{ steps.manifest.outputs.build_cmd }}
-          # Fail fast if Vite did not produce a production bundle (dev index.html
-          # references /src/main.tsx and breaks in the browser with MIME errors).
-          test -f dist/index.html
-          grep -q '/assets/' dist/index.html
-          ! grep -q '/src/main' dist/index.html
-          test -n "$(find dist/assets -name '*.js' -print -quit)"
-          echo "Vite production bundle OK ($(find dist/assets -name '*.js' | wc -l) JS chunks)"
+          if [ ! -d "dist/assets" ]; then
+            echo "Error: dist/assets directory not found. Is this a production build?"
+            exit 1
+          fi
+          if grep -q "/src/main" dist/index.html; then
+            echo "Error: index.html contains references to /src/main. This is a dev bundle!"
+            exit 1
+          fi
+          echo "Production bundle verified."
 
       - name: Build OCI image (dockworker + nix)
         env:
