@@ -18,8 +18,8 @@ updates:
 
   # npm ecosystem covers Bun's package.json once Step A (#4) lands. Bun
   # reads package.json and uses the npm registry; dependabot has no Bun-
-  # specific ecosystem yet. Until package.json exists, dependabot finds
-  # nothing to update and stays quiet.
+  # specific ecosystem yet. `.github/workflows/dependabot-bun-lockfile.yml`
+  # regenerates `bun.lock` on each npm dependabot PR so frozen-lockfile CI passes.
   - package-ecosystem: npm
     directory: /
     schedule:
