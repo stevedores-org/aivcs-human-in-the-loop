@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import type {
   Branch,
   PullRequest,
@@ -446,4 +446,77 @@ export function useAddComment(prId: string) {
   );
 
   return { addComment, isMutating, error };
+}
+
+export type PullRequestAction = "approve" | "merge" | "flag" | "request-changes";
+
+export interface ActionResponse {
+  ok: boolean;
+  action: PullRequestAction;
+  pr_id: string;
+}
+
+/**
+ * Hook for PR review actions (approve, merge, flag, request-changes).
+ */
+export function usePullRequestActions(prId: string) {
+  const [isMutating, setIsMutating] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+
+  const runAction = useCallback(
+    async (action: PullRequestAction): Promise<ActionResponse> => {
+      if (!prId) {
+        throw new Error("No pull request selected");
+      }
+      setIsMutating(true);
+      setError(null);
+
+      if (shouldUseMocks()) {
+        return new Promise<ActionResponse>((resolve) => {
+          setTimeout(() => {
+            setIsMutating(false);
+            resolve({ ok: true, action, pr_id: prId });
+          }, 200);
+        });
+      }
+
+      try {
+        const res = await apiFetch<ActionResponse>(`/pull-requests/${prId}/${action}`, {
+          method: "POST",
+        });
+        setIsMutating(false);
+        return res;
+      } catch (err) {
+        const parsedErr = err instanceof Error ? err : new Error(String(err));
+        setError(parsedErr);
+        setIsMutating(false);
+        throw parsedErr;
+      }
+    },
+    [prId],
+  );
+
+  return { runAction, isMutating, error };
+}
+
+/**
+ * Aggregated dashboard stats derived from branches + activity (FR-2.3).
+ */
+export function useDashboardStats() {
+  const { data: branches } = useBranches();
+  const { data: activity } = useActivity({ limit: 100 });
+
+  return useMemo(() => {
+    const activeAgents = new Set(
+      (branches ?? []).filter((b) => b.status === "active").map((b) => b.agent_owner),
+    ).size;
+    const openReviews = (branches ?? []).filter((b) => b.status === "active").length;
+    const items = activity?.items ?? [];
+    const approvedRequests = items.filter(
+      (item) => item.kind === "pr.commented" || item.summary.toLowerCase().includes("approve"),
+    ).length;
+    const mergeQueue = items.filter((item) => item.kind === "pr.merged").length;
+
+    return { activeAgents, openReviews, approvedRequests, mergeQueue };
+  }, [branches, activity]);
 }

@@ -44,6 +44,7 @@ export const mockBranches: Branch[] = [
     head_sha: "f1e2d3c4b5a6978800112233445566778899aabb",
     agent_owner: "agent:librarian",
     status: "active",
+    pull_request_id: "379",
   },
   {
     id: "br_02",
@@ -51,6 +52,7 @@ export const mockBranches: Branch[] = [
     head_sha: "aabbccddeeff00112233445566778899aabbccdd",
     agent_owner: "agent:codex",
     status: "merged",
+    pull_request_id: "pr-125",
   },
   {
     id: "br_03",
@@ -58,6 +60,7 @@ export const mockBranches: Branch[] = [
     head_sha: "00ff11ee22dd33cc44bb55aa66998877665544",
     agent_owner: "agent:dependabot",
     status: "abandoned",
+    pull_request_id: "pr-126",
   },
 ];
 
