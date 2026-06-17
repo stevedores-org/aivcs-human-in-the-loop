@@ -52,7 +52,7 @@
               bash
             ];
             extraCommands = ''
-              mkdir -p srv etc/caddy tmp
+              mkdir -p srv etc/caddy tmp usr/local/bin
               chmod 1777 tmp
               cp -R ${distPath}/. srv/
               cp ${./Caddyfile} etc/caddy/Caddyfile
