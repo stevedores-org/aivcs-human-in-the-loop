@@ -10,10 +10,16 @@ import "@fontsource/jetbrains-mono/600.css";
 import "@fontsource/jetbrains-mono/700.css";
 
 import App from "./app/App.tsx";
+import { AuthProvider } from "./lib/auth/AuthProvider.tsx";
+import { ConfigProvider } from "./lib/config/ConfigProvider.tsx";
 import "./styles/index.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <ConfigProvider>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </ConfigProvider>
   </StrictMode>,
 );

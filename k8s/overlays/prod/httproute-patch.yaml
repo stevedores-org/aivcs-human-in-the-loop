@@ -4,4 +4,4 @@ metadata:
   name: aivcs-human-in-the-loop
 spec:
   hostnames:
-    - aivcs-hitl.lornu.ai
+    - human.aivcs.io

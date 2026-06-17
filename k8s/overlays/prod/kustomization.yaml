@@ -15,8 +15,12 @@ images:
 configMapGenerator:
   - name: aivcs-hitl-config
     literals:
-      - AIVCS_API_URL=https://aivcs-api.lornu.ai
-      - SSO_ISSUER=https://auth.lornu.ai
+      - AIVCS_API_URL=https://api.aivcs.io
+      - SSO_ISSUER=https://auth.aivcs.io
+      - OAUTH_CLIENT_ID=aivcs-hitl
+      - USE_MOCKS=false
+      - REQUIRE_AUTH=true
+      - DEMO_MODE=false
 
 patches:
   - path: httproute-patch.yaml
