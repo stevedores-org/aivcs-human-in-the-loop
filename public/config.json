@@ -1,0 +1,8 @@
+{
+  "apiUrl": "http://localhost:3000",
+  "ssoIssuer": "https://auth.lornu.ai",
+  "oauthClientId": "aivcs-hitl",
+  "useMocks": true,
+  "requireAuth": false,
+  "demoMode": true
+}

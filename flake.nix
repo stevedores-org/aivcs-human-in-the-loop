@@ -49,15 +49,18 @@
             contents = with pkgs; [
               caddy
               cacert
+              bash
             ];
             extraCommands = ''
               mkdir -p srv etc/caddy tmp
               chmod 1777 tmp
               cp -R ${distPath}/. srv/
               cp ${./Caddyfile} etc/caddy/Caddyfile
+              cp ${./scripts/caddy-entrypoint.sh} usr/local/bin/caddy-entrypoint.sh
+              chmod +x usr/local/bin/caddy-entrypoint.sh
             '';
             config = {
-              Cmd = [ "${pkgs.caddy}/bin/caddy" "run" "--config" "/etc/caddy/Caddyfile" ];
+              Cmd = [ "${pkgs.bash}/bin/bash" "/usr/local/bin/caddy-entrypoint.sh" ];
               User = "65532:65532";
               WorkingDir = "/srv";
               Env = [

@@ -11,6 +11,7 @@ import type {
   CommentResponse,
   Message,
 } from "./types";
+import { getRuntimeConfig } from "../config/runtime-config";
 import {
   mockBranches,
   mockPullRequests,
@@ -22,8 +23,9 @@ import {
 } from "./mocks";
 
 // Helper to determine if we should run in mock mode.
-// We default to mock mode if VITE_USE_MOCKS is set to '1' or 'true'.
 export const shouldUseMocks = (): boolean => {
+  const runtime = getRuntimeConfig();
+  if (runtime) return runtime.useMocks;
   return (
     import.meta.env.VITE_USE_MOCKS === "1" ||
     import.meta.env.VITE_USE_MOCKS === "true"
@@ -32,10 +34,20 @@ export const shouldUseMocks = (): boolean => {
 
 // API Base URL resolver.
 export const getApiBaseUrl = (): string => {
+  const runtime = getRuntimeConfig();
+  if (runtime?.apiUrl) {
+    return runtime.apiUrl;
+  }
   if (import.meta.env.VITE_AIVCS_API_URL) {
     return import.meta.env.VITE_AIVCS_API_URL;
   }
   const host = window.location.hostname;
+  if (host === "human.aivcs.io" || host === "www.aivcs.io") {
+    return "https://api.aivcs.io";
+  }
+  if (host === "human-dev.aivcs.io") {
+    return "https://api-dev.aivcs.io";
+  }
   if (host === "aivcs-hitl.lornu.ai") {
     return "https://aivcs-api.lornu.ai";
   }
@@ -45,7 +57,7 @@ export const getApiBaseUrl = (): string => {
   if (host === "localhost" || host === "127.0.0.1") {
     return "http://localhost:3000";
   }
-  return "https://aivcs-api.dev.lornu.ai"; // Default fallback
+  return "https://api-dev.aivcs.io";
 };
 
 // General JSON fetcher that appends the SSO JWT token if present.
@@ -65,6 +77,9 @@ const apiFetch = async <T>(path: string, options: RequestInit = {}): Promise<T> 
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      window.__aivcsHandleUnauthorized?.();
+    }
     const errorText = await response.text().catch(() => "Unknown error");
     throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
   }

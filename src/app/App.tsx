@@ -9,6 +9,8 @@ import { BranchGraph } from "./components/BranchGraph";
 import { CIChecks } from "./components/CIChecks";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Toaster } from "sonner";
+import { useAuth } from "../lib/auth/AuthProvider";
+import { useRuntimeConfig } from "../lib/config/ConfigProvider";
 import {
   useBranches,
   usePullRequest,
@@ -18,6 +20,8 @@ import {
   useActivity,
   useAddComment,
 } from "../lib/api";
+import { DemoBanner } from "./components/DemoBanner";
+import { LoginGate } from "./components/LoginGate";
 
 function DashboardContent() {
   const [activePrId, setActivePrId] = useState<string>("379");
@@ -80,7 +84,7 @@ function DashboardContent() {
 
   return (
     <div
-      className="flex h-screen w-screen overflow-hidden bg-background text-foreground"
+      className="flex flex-1 min-h-0 w-full overflow-hidden bg-background text-foreground"
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
       <Sidebar
@@ -153,9 +157,29 @@ function DashboardContent() {
 }
 
 export default function App() {
+  const { config, isLoading: configLoading } = useRuntimeConfig();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+
+  if (configLoading || authLoading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-background text-foreground">
+        <p className="text-muted-foreground" style={{ fontSize: "14px" }}>
+          Loading…
+        </p>
+      </div>
+    );
+  }
+
+  if (config?.requireAuth && !isAuthenticated) {
+    return <LoginGate />;
+  }
+
   return (
     <ErrorBoundary>
-      <DashboardContent />
+      <div className="flex h-screen w-screen flex-col overflow-hidden">
+        <DemoBanner />
+        <DashboardContent />
+      </div>
       <Toaster theme="dark" closeButton position="top-right" />
     </ErrorBoundary>
   );
