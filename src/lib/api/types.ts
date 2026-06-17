@@ -1,7 +1,10 @@
 import type { components } from "./schema";
 
 export type BranchStatus = components["schemas"]["BranchStatus"];
-export type Branch = components["schemas"]["Branch"];
+export type Branch = components["schemas"]["Branch"] & {
+  /** When set, selects the PR panel for this branch (FR-2.1). */
+  pull_request_id?: string;
+};
 export type BranchesResponse = components["schemas"]["BranchesResponse"];
 export type PullRequestStatus = components["schemas"]["PullRequestStatus"];
 export type CiSummary = components["schemas"]["CiSummary"];

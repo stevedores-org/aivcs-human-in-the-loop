@@ -17,6 +17,11 @@ interface PRDiffPanelProps {
   diff: PullRequestDiff | null;
   isLoading: boolean;
   error: Error | null;
+  isActionPending?: boolean;
+  onApprove?: () => void;
+  onMerge?: () => void;
+  onFlag?: () => void;
+  onRequestChanges?: () => void;
 }
 
 interface DiffLine {
@@ -83,6 +88,11 @@ export function PRDiffPanel({
   diff,
   isLoading,
   error,
+  isActionPending = false,
+  onApprove,
+  onMerge,
+  onFlag,
+  onRequestChanges,
 }: PRDiffPanelProps) {
   const [selectedFileIdx, setSelectedFileIdx] = useState(0);
 
@@ -90,7 +100,11 @@ export function PRDiffPanel({
   const activeFile = files[selectedFileIdx];
   const diffLines = activeFile ? parsePatch(activeFile.patch) : [];
 
-  const handleAction = (actionName: string) => {
+  const handleAction = (actionName: string, handler?: () => void) => {
+    if (handler) {
+      handler();
+      return;
+    }
     toast.success(`Action Executed: ${actionName} for PR #${pullRequest?.number ?? ""}`, {
       description: `Successfully triggered ${actionName.toLowerCase()} flow.`,
     });
@@ -264,32 +278,36 @@ export function PRDiffPanel({
       {/* Actions */}
       <div className="px-3 py-2 border-t border-border flex items-center gap-2 shrink-0 flex-wrap">
         <button
-          onClick={() => handleAction("Request Changes")}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
+          onClick={() => handleAction("Request Changes", onRequestChanges)}
+          disabled={isActionPending}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
           style={{ fontSize: "11px" }}
         >
           <XCircle size={11} />
           Request Changes
         </button>
         <button
-          onClick={() => handleAction("Approve")}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors cursor-pointer"
+          onClick={() => handleAction("Approve", onApprove)}
+          disabled={isActionPending}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-green-500/30 bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors cursor-pointer disabled:opacity-50"
           style={{ fontSize: "11px" }}
         >
           <GitMerge size={11} />
           Approve
         </button>
         <button
-          onClick={() => handleAction("Merge")}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-pointer"
+          onClick={() => handleAction("Merge", onMerge)}
+          disabled={isActionPending}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition-colors cursor-pointer disabled:opacity-50"
           style={{ fontSize: "11px" }}
         >
           <GitMerge size={11} />
           Merge
         </button>
         <button
-          onClick={() => handleAction("Flag")}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer"
+          onClick={() => handleAction("Flag", onFlag)}
+          disabled={isActionPending}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer disabled:opacity-50"
           style={{ fontSize: "11px" }}
         >
           <Flag size={11} />

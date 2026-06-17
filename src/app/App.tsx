@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sidebar } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
 import { StatCards } from "./components/StatCards";
@@ -9,6 +9,7 @@ import { BranchGraph } from "./components/BranchGraph";
 import { CIChecks } from "./components/CIChecks";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { Toaster } from "sonner";
+import { toast } from "sonner";
 import { useAuth } from "../lib/auth/AuthProvider";
 import { useRuntimeConfig } from "../lib/config/ConfigProvider";
 import {
@@ -19,44 +20,55 @@ import {
   useCIChecks,
   useActivity,
   useAddComment,
+  useDashboardStats,
+  usePullRequestActions,
+  branchPullRequestId,
+  selectDefaultPullRequestId,
 } from "../lib/api";
 import { DemoBanner } from "./components/DemoBanner";
 import { LoginGate } from "./components/LoginGate";
 
 function DashboardContent() {
-  const [activePrId, setActivePrId] = useState<string>("379");
-
-  // Call the typed api hooks
   const {
     data: branches,
     isLoading: isLoadingBranches,
     error: errorBranches,
   } = useBranches();
 
+  const [activePrId, setActivePrId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activePrId || isLoadingBranches) return;
+    const defaultId = selectDefaultPullRequestId(branches);
+    if (defaultId) setActivePrId(defaultId);
+  }, [branches, isLoadingBranches, activePrId]);
+
+  const prId = activePrId ?? "";
+
   const {
     data: pullRequest,
     isLoading: isLoadingPR,
     error: errorPR,
-  } = usePullRequest(activePrId);
+  } = usePullRequest(prId);
 
   const {
     data: diff,
     isLoading: isLoadingDiff,
     error: errorDiff,
-  } = usePullRequestDiff(activePrId);
+  } = usePullRequestDiff(prId);
 
   const {
     data: intentThread,
     isLoading: isLoadingIntent,
     error: errorIntent,
     refetch: refetchIntent,
-  } = useAgentIntent(activePrId);
+  } = useAgentIntent(prId);
 
   const {
     data: checks,
     isLoading: isLoadingChecks,
     error: errorChecks,
-  } = useCIChecks(activePrId);
+  } = useCIChecks(prId);
 
   const {
     data: activity,
@@ -64,12 +76,14 @@ function DashboardContent() {
     error: errorActivity,
   } = useActivity({ limit: 50 });
 
-  const { addComment, isMutating: isAddingComment } = useAddComment(activePrId);
+  const { addComment, isMutating: isAddingComment } = useAddComment(prId);
+  const { runAction, isMutating: isRunningAction } = usePullRequestActions(prId);
+  const dashboardStats = useDashboardStats();
 
   const handleSelectBranch = (branchName: string) => {
     const branch = branches?.find((b) => b.name === branchName);
     if (branch) {
-      setActivePrId(branch.id);
+      setActivePrId(branchPullRequestId(branch));
     }
   };
 
@@ -79,8 +93,22 @@ function DashboardContent() {
     return res;
   };
 
-  const activeBranch = branches?.find((b) => b.id === activePrId);
-  const activeBranchName = activeBranch ? activeBranch.name : "feature/auth-refactor";
+  const activeBranch = branches?.find(
+    (b) => branchPullRequestId(b) === activePrId || b.id === activePrId,
+  );
+  const activeBranchName = activeBranch?.name ?? pullRequest?.head ?? "—";
+
+  const handleReviewAction = async (
+    action: "approve" | "merge" | "flag" | "request-changes",
+    label: string,
+  ) => {
+    try {
+      await runAction(action);
+      toast.success(`${label} recorded for PR #${pullRequest?.number ?? ""}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : `Failed to ${label.toLowerCase()}`);
+    }
+  };
 
   return (
     <div
@@ -101,7 +129,7 @@ function DashboardContent() {
 
         <main className="flex-1 overflow-hidden p-3 flex flex-col gap-3 min-h-0">
           {/* Stat cards row */}
-          <StatCards />
+          <StatCards stats={dashboardStats} />
 
           {/* Middle row: PR Diff + Agent Intent */}
           <div className="flex gap-3 flex-1 min-h-0" style={{ minHeight: 0, flex: "1 1 0" }}>
@@ -112,6 +140,11 @@ function DashboardContent() {
                 diff={diff}
                 isLoading={isLoadingPR || isLoadingDiff}
                 error={errorPR || errorDiff}
+                isActionPending={isRunningAction}
+                onApprove={() => handleReviewAction("approve", "Approve")}
+                onMerge={() => handleReviewAction("merge", "Merge")}
+                onFlag={() => handleReviewAction("flag", "Flag for review")}
+                onRequestChanges={() => handleReviewAction("request-changes", "Request changes")}
               />
             </div>
 
