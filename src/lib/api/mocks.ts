@@ -5,7 +5,37 @@ import type {
   IntentThread,
   CiCheck,
   Activity,
+  ActivityKind,
 } from "./types";
+
+type ScenarioBranch = {
+  name: string;
+  head_sha: string;
+  agent_owner: string;
+};
+
+type ScenarioCiCheck = {
+  name: string;
+  status: CiCheck["status"];
+  conclusion: CiCheck["conclusion"];
+  details_url?: string;
+};
+
+type ScenarioAuditEvent = {
+  id: string;
+  kind: string;
+  at: string;
+  summary: string;
+  actor?: string;
+  subject?: string;
+};
+
+type DemoScenario = {
+  pull_request: PullRequest;
+  branches: ScenarioBranch[];
+  ci_checks: ScenarioCiCheck[];
+  audit_events: ScenarioAuditEvent[];
+};
 
 export const mockBranches: Branch[] = [
   {
@@ -243,13 +273,13 @@ export class MockDatabase {
       if (!listRes.ok) throw new Error("no scenarios list");
       const list = (await listRes.json()) as string[];
 
-      const scenarios = await Promise.all(
+      const scenarios = (await Promise.all(
         list.map(async (id) => {
           const res = await fetch(`/scenarios/${id}/seed.json`);
           if (!res.ok) throw new Error(`failed to load scenario ${id}`);
           return res.json();
         })
-      );
+      )) as DemoScenario[];
 
       const branchesList: Branch[] = [];
       const prs: Record<string, PullRequest> = {};
@@ -326,7 +356,7 @@ export class MockDatabase {
 
         // CI Checks
         checksList[prId] = {
-          checks: scenario.ci_checks.map((chk: any) => ({
+          checks: scenario.ci_checks.map((chk) => ({
             name: chk.name,
             status: chk.status,
             conclusion: chk.conclusion,
@@ -336,7 +366,7 @@ export class MockDatabase {
 
         // Map Audit Events to Activity
         for (const evt of scenario.audit_events) {
-          let kind: any = "pr.commented";
+          let kind: ActivityKind = "pr.commented";
           if (evt.kind === "agent_run") kind = "pr.opened";
           else if (evt.kind === "ci_check") {
             kind = evt.summary.toLowerCase().includes("fail") ? "ci.failed" : "ci.passed";
