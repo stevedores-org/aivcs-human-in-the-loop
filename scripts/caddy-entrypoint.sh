@@ -18,7 +18,7 @@ bool_json() {
   esac
 }
 
-<<EOF > "$CONFIG_JSON"
+> "$CONFIG_JSON" <<EOF
 {
   "apiUrl": "${AIVCS_API_URL}",
   "ssoIssuer": "${SSO_ISSUER}",
@@ -29,7 +29,7 @@ bool_json() {
 }
 EOF
 
-<<'EOF' > "$CADDYFILE"
+> "$CADDYFILE" <<'EOF'
 {
 	admin off
 	auto_https off
