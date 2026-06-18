@@ -38,6 +38,18 @@
                 NIX_HITL_DIST=$PWD/dist nix build .#oci --impure
             '';
 
+        docsDistPath =
+          let
+            fromEnv = builtins.getEnv "NIX_HITL_DOCS_DIST";
+          in
+            if fromEnv != "" then
+              builtins.path {
+                path = fromEnv;
+                name = "hitl-docs-dist";
+              }
+            else if builtins.pathExists ./docs/.vitepress/dist then ./docs/.vitepress/dist
+            else null;
+
         packages = {
           # dockworker.ai OCI output (`oci.nix_output` in dockworker.toml).
           # CI runs `bun run build` (React + Vite → dist/) then Nix packages
@@ -56,6 +68,7 @@
               mkdir -p srv etc/caddy tmp usr/local/bin
               chmod 1777 tmp
               cp -R ${distPath}/. srv/
+              ${if docsDistPath != null then "mkdir -p srv/docs && cp -R ${docsDistPath}/. srv/docs/" else ""}
               cp ${./Caddyfile} etc/caddy/Caddyfile
               cp ${./scripts/caddy-entrypoint.sh} usr/local/bin/caddy-entrypoint.sh
               chmod +x usr/local/bin/caddy-entrypoint.sh

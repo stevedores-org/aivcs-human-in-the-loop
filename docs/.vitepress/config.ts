@@ -3,6 +3,8 @@ import { defineConfig } from "vitepress"
 export default defineConfig({
   title: "AIVCS",
   description: "Advance AI Version Control",
+  base: "/docs/",
+  cleanUrls: true,
   themeConfig: {
     nav: [
       { text: "Home", link: "/" },

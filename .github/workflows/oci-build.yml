@@ -120,6 +120,7 @@ jobs:
           set -euo pipefail
           ${{ steps.manifest.outputs.install_cmd }}
           ${{ steps.manifest.outputs.build_cmd }}
+          bun run docs:build
           if [ ! -d "dist/assets" ]; then
             echo "Error: dist/assets directory not found. Is this a production build?"
             exit 1
@@ -133,6 +134,7 @@ jobs:
       - name: Build OCI image (dockworker + nix)
         env:
           NIX_HITL_DIST: ${{ github.workspace }}/dist
+          NIX_HITL_DOCS_DIST: ${{ github.workspace }}/docs/.vitepress/dist
         run: |
           set -euo pipefail
           nix build ".#${{ steps.manifest.outputs.nix_output }}" -L --impure
