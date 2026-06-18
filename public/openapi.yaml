@@ -1,0 +1,356 @@
+openapi: 3.1.0
+info:
+  title: aivcs-api
+  version: 0.1.0
+  summary: Bun + Hono facade over stevedores-org/data-fabric for the aivcs human-in-the-loop UI.
+  description: |
+    Browser → aivcs-api → stevedores-org/data-fabric.
+
+    The browser SSO JWT is validated and STRIPPED on egress; the data-fabric
+    is called with a service binding token. See AGENTS.md §4.
+
+servers:
+  - url: https://aivcs-api.lornu.ai
+    description: production
+  - url: http://localhost:3000
+    description: local dev
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: branches
+  - name: pull-requests
+  - name: activity
+  - name: meta
+
+paths:
+  /healthz:
+    get:
+      tags: [meta]
+      summary: Liveness probe
+      security: []
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok, service, version]
+                properties:
+                  ok: { type: boolean }
+                  service: { type: string }
+                  version: { type: string }
+
+  /branches:
+    get:
+      tags: [branches]
+      summary: List branches
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BranchesResponse'
+
+  /pull-requests/{id}:
+    get:
+      tags: [pull-requests]
+      summary: PR summary including agent intent and CI summary
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PullRequest'
+
+  /pull-requests/{id}/diff:
+    get:
+      tags: [pull-requests]
+      summary: File diffs for a PR
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PullRequestDiff'
+
+  /pull-requests/{id}/intent:
+    get:
+      tags: [pull-requests]
+      summary: Agent + human comment thread for a PR
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntentThread'
+
+  /pull-requests/{id}/ci-checks:
+    get:
+      tags: [pull-requests]
+      summary: CI checks for a PR
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CiChecksResponse'
+
+  /pull-requests/{id}/comment:
+    post:
+      tags: [pull-requests]
+      summary: Human reply to the agent intent thread
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentRequest'
+      responses:
+        '201':
+          description: created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /activity:
+    get:
+      tags: [activity]
+      summary: Paginated audit trail
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - in: query
+          name: cursor
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Lornu SSO JWT. Stripped on egress to data-fabric.
+
+  parameters:
+    IdParam:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: bad request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string }
+    Unauthorized:
+      description: unauthorized
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string }
+
+  schemas:
+    BranchStatus:
+      type: string
+      enum: [active, merged, abandoned]
+
+    Branch:
+      type: object
+      required: [id, name, head_sha, agent_owner, status]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        head_sha: { type: string }
+        agent_owner: { type: string }
+        status:
+          $ref: '#/components/schemas/BranchStatus'
+
+    BranchesResponse:
+      type: object
+      required: [branches]
+      properties:
+        branches:
+          type: array
+          items: { $ref: '#/components/schemas/Branch' }
+
+    PullRequestStatus:
+      type: string
+      enum: [open, draft, merged, closed]
+
+    CiSummary:
+      type: object
+      required: [total, succeeded, failed, pending]
+      properties:
+        total: { type: integer }
+        succeeded: { type: integer }
+        failed: { type: integer }
+        pending: { type: integer }
+
+    PullRequest:
+      type: object
+      required: [id, number, title, base, head, status, agent_intent, ci_summary]
+      properties:
+        id: { type: string }
+        number: { type: integer }
+        title: { type: string }
+        base: { type: string }
+        head: { type: string }
+        status:
+          $ref: '#/components/schemas/PullRequestStatus'
+        agent_intent: { type: string }
+        ci_summary:
+          $ref: '#/components/schemas/CiSummary'
+
+    DiffFile:
+      type: object
+      required: [path, additions, deletions, patch]
+      properties:
+        path: { type: string }
+        additions: { type: integer }
+        deletions: { type: integer }
+        patch: { type: string }
+
+    PullRequestDiff:
+      type: object
+      required: [files]
+      properties:
+        files:
+          type: array
+          items: { $ref: '#/components/schemas/DiffFile' }
+
+    Message:
+      type: object
+      required: [role, at, body]
+      properties:
+        role:
+          type: string
+          enum: [agent, human]
+        at:
+          type: string
+          format: date-time
+        body:
+          type: string
+
+    IntentThread:
+      type: object
+      required: [thread]
+      properties:
+        thread:
+          type: array
+          items: { $ref: '#/components/schemas/Message' }
+
+    CiCheck:
+      type: object
+      required: [name, status, conclusion, url]
+      properties:
+        name: { type: string }
+        status:
+          type: string
+          enum: [queued, in_progress, completed]
+        conclusion:
+          type: [string, 'null']
+          enum: [success, failure, neutral, cancelled, timed_out, action_required, skipped, null]
+        url: { type: string }
+
+    CiChecksResponse:
+      type: object
+      required: [checks]
+      properties:
+        checks:
+          type: array
+          items: { $ref: '#/components/schemas/CiCheck' }
+
+    Activity:
+      type: object
+      required: [id, kind, at, actor, subject, summary]
+      properties:
+        id: { type: string }
+        kind:
+          type: string
+          enum:
+            - branch.opened
+            - pr.opened
+            - pr.commented
+            - pr.merged
+            - ci.failed
+            - ci.passed
+        at:
+          type: string
+          format: date-time
+        actor: { type: string }
+        subject: { type: string }
+        summary: { type: string }
+
+    ActivityResponse:
+      type: object
+      required: [items, next_cursor]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Activity' }
+        next_cursor:
+          type: [string, 'null']
+
+    CommentRequest:
+      type: object
+      required: [body]
+      properties:
+        body:
+          type: string
+          minLength: 1
+          maxLength: 8000
+
+    CommentResponse:
+      type: object
+      required: [comment]
+      properties:
+        comment:
+          $ref: '#/components/schemas/Message'
+        pr_id:
+          type: string
+        actor:
+          type: [string, 'null']
