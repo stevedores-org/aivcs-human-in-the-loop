@@ -295,16 +295,20 @@ export class MockDatabase {
         const pr = scenario.pull_request;
         const prId = pr.id;
 
-        // Map branches
-        for (const b of scenario.branches) {
+        // Map branches. Each branch needs a unique id (multiple branches per
+        // scenario would otherwise collide as React keys) and an explicit
+        // pull_request_id so branchPullRequestId resolves to the right PR
+        // instead of falling back to the (shared) branch id.
+        scenario.branches.forEach((b, i) => {
           branchesList.push({
-            id: prId,
+            id: `${prId}-br-${i}`,
             name: b.name,
             head_sha: b.head_sha,
             agent_owner: b.agent_owner,
             status: "active",
+            pull_request_id: prId,
           });
-        }
+        });
 
         // Map PullRequest
         prs[prId] = {

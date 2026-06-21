@@ -24,7 +24,7 @@ export function deriveDashboardStats(
   const openReviews = (branches ?? []).filter((b) => b.status === "active").length;
 
   const approvedRequests = (activity ?? []).filter((item) =>
-    item.kind === "pr.commented" || item.summary.toLowerCase().includes("approve"),
+    item.summary.toLowerCase().includes("approve"),
   ).length;
 
   const mergeQueue = (activity ?? []).filter((item) => item.kind === "pr.merged").length;

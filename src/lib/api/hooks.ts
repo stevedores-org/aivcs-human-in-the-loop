@@ -512,8 +512,8 @@ export function useDashboardStats() {
     ).size;
     const openReviews = (branches ?? []).filter((b) => b.status === "active").length;
     const items = activity?.items ?? [];
-    const approvedRequests = items.filter(
-      (item) => item.kind === "pr.commented" || item.summary.toLowerCase().includes("approve"),
+    const approvedRequests = items.filter((item) =>
+      item.summary.toLowerCase().includes("approve"),
     ).length;
     const mergeQueue = items.filter((item) => item.kind === "pr.merged").length;
 
