@@ -21,8 +21,8 @@
 
 ## Phase 3 — Product polish (#36)
 
-- [ ] FR-3.1 Routing (`/reviews`, `/agents`, …)
-- [ ] FR-3.2 Search
-- [ ] FR-3.3 Real-time updates
-- [ ] FR-3.4 Multi-workspace
-- [ ] FR-3.5 Merge queue view
+- [x] FR-3.1 Routing (`/reviews`, `/agents`, …)
+- [x] FR-3.2 Search
+- [x] FR-3.3 Real-time updates
+- [x] FR-3.4 Multi-workspace
+- [x] FR-3.5 Merge queue view
