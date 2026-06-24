@@ -3,6 +3,7 @@
 
 skip-check:
   - CKV_K8S_21  # The default namespace should not be used
+  - CKV2_K8S_6  # NetworkPolicy is managed externally/globally, not in this frontend repo
 
 skip-path:
   - k8s/overlays/.*/httproute-patch\.yaml
