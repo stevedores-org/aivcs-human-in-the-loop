@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: aivcs-human-in-the-loop
+  labels:
+    app.kubernetes.io/name: aivcs-human-in-the-loop
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: aivcs
+spec:
+  # Selects the frontend pods. kustomize (includeSelectors: true) also injects
+  # app.kubernetes.io/name + part-of here, keeping this in sync per overlay.
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: aivcs-human-in-the-loop
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Frontend HTTP, reached via the Gateway/HTTPRoute. Restrict to the http port.
+    - ports:
+        - protocol: TCP
+          port: 3000
+  egress:
+    # DNS resolution.
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Permissive otherwise so outbound calls to the AIVCS API and SSO issuer
+    # keep working; tighten to specific CIDRs/ports once endpoints are pinned.
+    - {}
