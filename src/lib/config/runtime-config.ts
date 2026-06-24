@@ -57,6 +57,17 @@ function configFromHostname(): RuntimeConfig {
     };
   }
 
+  if (host === "preview.aivcs.io" || host === "demo.aivcs.io") {
+    return {
+      apiUrl: "https://api-dev.aivcs.io",
+      ssoIssuer: "https://auth-dev.aivcs.io",
+      oauthClientId: "aivcs-hitl",
+      useMocks: true,
+      requireAuth: true,
+      demoMode: true,
+    };
+  }
+
   if (host === "localhost" || host === "127.0.0.1") {
     return {
       apiUrl: "http://localhost:3000",
