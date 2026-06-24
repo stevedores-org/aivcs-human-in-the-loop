@@ -1,0 +1,25 @@
+import type { components } from "./schema";
+
+export type BranchStatus = components["schemas"]["BranchStatus"];
+export type Branch = components["schemas"]["Branch"] & {
+  /** When set, selects the PR panel for this branch (FR-2.1). */
+  pull_request_id?: string;
+};
+export type BranchesResponse = components["schemas"]["BranchesResponse"];
+export type PullRequestStatus = components["schemas"]["PullRequestStatus"];
+export type CiSummary = components["schemas"]["CiSummary"];
+export type PullRequest = components["schemas"]["PullRequest"];
+export type DiffFile = components["schemas"]["DiffFile"];
+export type PullRequestDiff = components["schemas"]["PullRequestDiff"];
+export type MessageRole = components["schemas"]["Message"]["role"];
+export type Message = components["schemas"]["Message"];
+export type IntentThread = components["schemas"]["IntentThread"];
+export type CheckStatus = components["schemas"]["CiCheck"]["status"];
+export type CheckConclusion = components["schemas"]["CiCheck"]["conclusion"];
+export type CiCheck = components["schemas"]["CiCheck"];
+export type CiChecksResponse = components["schemas"]["CiChecksResponse"];
+export type ActivityKind = components["schemas"]["Activity"]["kind"];
+export type Activity = components["schemas"]["Activity"];
+export type ActivityResponse = components["schemas"]["ActivityResponse"];
+export type CommentRequest = components["schemas"]["CommentRequest"];
+export type CommentResponse = components["schemas"]["CommentResponse"];

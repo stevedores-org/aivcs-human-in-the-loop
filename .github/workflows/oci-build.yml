@@ -1,27 +1,18 @@
-# OCI build & publish for aivcs-human-in-the-loop.
+# OCI build & publish via dockworker.ai
+#
+# Canonical manifest: dockworker.toml (OCI spec 1.0, engine = "nix").
+# No Dockerfile, Docker daemon, or buildx — CI materializes the image with
+# `nix build .#<nix_output>` and pushes to GAR with skopeo.
 #
 # Triggers:
 #   - push to `develop`  -> tags: develop, sha-<short>
 #   - push to tag `v*`   -> tags: <semver>, latest, sha-<short>
 #
-# Auth:
-#   - GHCR via GITHUB_TOKEN (packages: write).
-#   - id-token: write is reserved for keyless cosign signing in a follow-up
-#     PR (see dockworker.toml [oci.signing]).
-#
-# Build model:
-#   - dockworker.toml is the canonical OCI manifest. There is intentionally
-#     NO Dockerfile — per lornu-ai org standard, OCI builds for web apps
-#     are dockworker-only.
-#   - This workflow shells out to `dockworker build` to materialize the
-#     image from dockworker.toml, then `dockworker push` to GHCR. The
-#     `dockworker` CLI is installed from the dockworker.ai release feed.
-#   - docker buildx is still set up for QEMU + multi-arch emulation that
-#     dockworker delegates to under the hood.
-#
-# All third-party actions are pinned to a commit SHA. Bump deliberately.
+# Required repo secrets (synced from GCP Secret Manager in gcp-lornu-ai):
+#   - GCP_WIF_PROVIDER
+#   - GCP_WIF_SERVICE_ACCOUNT
 
-name: oci-build
+name: Build and Push OCI Image
 
 on:
   push:
@@ -35,80 +26,148 @@ concurrency:
 
 permissions:
   contents: read
-  packages: write
-  # Reserved for keyless cosign signing in a follow-up PR.
   id-token: write
-  attestations: write
-
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: stevedores-org/aivcs-human-in-the-loop
-  # Pin the dockworker CLI version. Bump deliberately in a dep-update PR.
-  DOCKWORKER_VERSION: "0.4.0"
 
 jobs:
-  build:
-    name: build & push multi-arch
+  build-and-push:
+    name: Build and Push OCI Image
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v5.0.0
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf # v3.2.0
+      - name: Validate dockworker.toml
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import sys
+          import tomllib
+
+          with open("dockworker.toml", "rb") as f:
+              cfg = tomllib.load(f)
+
+          assert cfg["oci"]["spec"] == "1.0", "oci.spec must be 1.0"
+          assert cfg["oci"]["builder"] == "nix", "oci.builder must be nix"
+          assert cfg["build"]["engine"] == "nix", "build.engine must be nix"
+          assert "nix_output" in cfg["oci"], "oci.nix_output is required"
+          assert cfg["registry"]["url"], "registry.url is required"
+          assert cfg["registry"]["name"], "registry.name is required"
+          print("dockworker.toml OK")
+          print(f"  package: {cfg['package']['name']}")
+          print(f"  nix_output: {cfg['oci']['nix_output']}")
+          print(f"  registry: {cfg['registry']['url']}/{cfg['registry']['name']}")
+          PY
+
+      - name: Load dockworker manifest
+        id: manifest
+        run: |
+          set -euo pipefail
+          python3 <<'PY' >> "$GITHUB_OUTPUT"
+          import tomllib
+
+          with open("dockworker.toml", "rb") as f:
+              cfg = tomllib.load(f)
+
+          registry_url = cfg["registry"]["url"].rstrip("/")
+          image_name = cfg["registry"]["name"]
+          nix_output = cfg["oci"]["nix_output"]
+          install_cmd = cfg["build"]["install"]
+          build_cmd = cfg["build"]["build"]
+
+          # us-central1-docker.pkg.dev/gcp-lornu-ai/lornu
+          host, _, path = registry_url.partition("/")
+          region, _, _ = host.partition("-docker.pkg.dev")
+          project, repo = path.split("/", 1)
+
+          print(f"nix_output={nix_output}")
+          print(f"install_cmd={install_cmd}")
+          print(f"build_cmd={build_cmd}")
+          print(f"gar_host={host}")
+          print(f"gcp_region={region}")
+          print(f"gcp_project={project}")
+          print(f"gar_repo={repo}")
+          print(f"image_name={image_name}")
+          print(f"gar_image={registry_url}/{image_name}")
+          PY
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v1.2.2
         with:
-          platforms: linux/amd64,linux/arm64
+          bun-version: latest
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349 # v3.7.1
-
-      - name: Log in to GHCR
-        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+      - name: Install Nix
+        uses: cachix/install-nix-action@8aa03977d8d733052d78f4e008a241fd1dbf36b3 # v31.10.6
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_WIF_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_lifetime: 1800s
+
+      - name: Configure skopeo policy
+        run: |
+          mkdir -p ~/.config/containers
+          echo '{"default":[{"type":"insecureAcceptAnything"}]}' > ~/.config/containers/policy.json
+          echo 'unqualified-search-registries = ["docker.io"]' > ~/.config/containers/registries.conf
+
+      - name: CI Guard - Verify Production Bundle
+        run: |
+          set -euo pipefail
+          ${{ steps.manifest.outputs.install_cmd }}
+          ${{ steps.manifest.outputs.build_cmd }}
+          if [ ! -d "dist/assets" ]; then
+            echo "Error: dist/assets directory not found. Is this a production build?"
+            exit 1
+          fi
+          if grep -q "/src/main" dist/index.html; then
+            echo "Error: index.html contains references to /src/main. This is a dev bundle!"
+            exit 1
+          fi
+          echo "Production bundle verified."
+
+      - name: Build OCI image (dockworker + nix)
+        env:
+          NIX_HITL_DIST: ${{ github.workspace }}/dist
+        run: |
+          set -euo pipefail
+          nix build ".#${{ steps.manifest.outputs.nix_output }}" -L --impure
+          ls -lh result
 
       - name: Compute image tags
         id: meta
-        uses: docker/metadata-action@369eb591f429131d6889c46b94e711f089e6ca96 # v5.6.1
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=tag
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,prefix=sha-,format=short
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
-
-      - name: Install dockworker CLI
         run: |
           set -euo pipefail
-          curl -fsSL "https://dockworker.ai/install.sh" \
-            | DOCKWORKER_VERSION="${DOCKWORKER_VERSION}" sh
-          dockworker --version
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          TAGS=("sha-${SHORT_SHA}")
+          if [ "${GITHUB_REF}" = "refs/heads/develop" ]; then
+            TAGS+=("develop")
+          fi
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            TAGS+=("latest")
+            TAGS+=("${GITHUB_REF_NAME#v}")
+          fi
+          printf '%s\n' "${TAGS[@]}" > tags.txt
+          echo "tags<<EOF" >> "$GITHUB_OUTPUT"
+          cat tags.txt >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
-      - name: dockworker build (multi-arch)
+      - name: Push to GAR (dockworker registry)
         env:
-          DOCKWORKER_TAGS: ${{ steps.meta.outputs.tags }}
-          DOCKWORKER_CACHE_SCOPE: oci-multi
+          ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          GAR_IMAGE: ${{ steps.manifest.outputs.gar_image }}
         run: |
           set -euo pipefail
-          dockworker build \
-            --config dockworker.toml \
-            --platform linux/amd64,linux/arm64 \
-            --tag-list "${DOCKWORKER_TAGS}" \
-            --cache-from "type=gha,scope=${DOCKWORKER_CACHE_SCOPE}" \
-            --cache-to   "type=gha,mode=max,scope=${DOCKWORKER_CACHE_SCOPE}" \
-            --provenance \
-            --sbom
-
-      - name: dockworker push (multi-arch)
-        env:
-          DOCKWORKER_TAGS: ${{ steps.meta.outputs.tags }}
-        run: |
-          set -euo pipefail
-          dockworker push \
-            --config dockworker.toml \
-            --tag-list "${DOCKWORKER_TAGS}"
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            echo "Pushing ${GAR_IMAGE}:${tag}"
+            nix shell nixpkgs#skopeo -c skopeo copy \
+              --dest-creds="oauth2accesstoken:${ACCESS_TOKEN}" \
+              docker-archive:result \
+              "docker://${GAR_IMAGE}:${tag}"
+          done < tags.txt
+          echo "Pushed ${GAR_IMAGE} ($(tr '\n' ' ' < tags.txt))"

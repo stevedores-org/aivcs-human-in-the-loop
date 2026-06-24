@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "ignoreDeprecations": "6.0",
     "target": "ES2022",
     "useDefineForClassFields": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
@@ -19,9 +20,11 @@
     "esModuleInterop": true,
     "isolatedModules": true,
     "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "paths": {
       "@/*": ["src/*"]
-    }
+    },
+    "types": ["bun-types", "react", "react-dom"]
   },
   "include": ["src", "vite.config.ts"]
 }

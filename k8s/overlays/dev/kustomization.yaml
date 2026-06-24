@@ -7,14 +7,18 @@ resources:
   - ../../base
 
 images:
-  - name: ghcr.io/stevedores-org/aivcs-human-in-the-loop
+  - name: us-central1-docker.pkg.dev/gcp-lornu-ai/lornu/aivcs-human-in-the-loop
     newTag: develop
 
 configMapGenerator:
   - name: aivcs-hitl-config
     literals:
-      - AIVCS_API_URL=https://aivcs-api.dev.lornu.ai
-      - SSO_ISSUER=https://auth.dev.lornu.ai
+      - AIVCS_API_URL=https://api-dev.aivcs.io
+      - SSO_ISSUER=https://auth-dev.aivcs.io
+      - OAUTH_CLIENT_ID=aivcs-hitl
+      - USE_MOCKS=false
+      - REQUIRE_AUTH=true
+      - DEMO_MODE=false
 
 generatorOptions:
   disableNameSuffixHash: false
