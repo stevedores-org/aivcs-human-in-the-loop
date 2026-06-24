@@ -1,0 +1,52 @@
+name: Metadata Guardrails
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  metadata-check:
+    name: Verify Repository Metadata
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check Repository Metadata
+        run: |
+          echo "Checking metadata for ${{ github.repository }}..."
+          
+          # Query repository details
+          REPO_INFO=$(gh repo view "${{ github.repository }}" --json description,repositoryTopics)
+          
+          DESCRIPTION=$(echo "$REPO_INFO" | jq -r '.description')
+          TOPICS_COUNT=$(echo "$REPO_INFO" | jq '.repositoryTopics | length')
+          
+          echo "Description: '$DESCRIPTION'"
+          echo "Topics Count: $TOPICS_COUNT"
+          
+          FAILED=0
+          
+          if [ -z "$DESCRIPTION" ] || [ "$DESCRIPTION" = "null" ]; then
+            echo "❌ Error: Repository description is empty!"
+            FAILED=1
+          fi
+          
+          if [ "$TOPICS_COUNT" -eq 0 ] || [ "$TOPICS_COUNT" = "null" ]; then
+            echo "❌ Error: Repository has no topics/keywords!"
+            FAILED=1
+          fi
+          
+          if [ "$FAILED" -eq 1 ]; then
+            echo "Please configure the repository's About section on GitHub with a description and topics."
+            exit 1
+          fi
+          
+          echo "✅ Metadata guardrails check passed!"

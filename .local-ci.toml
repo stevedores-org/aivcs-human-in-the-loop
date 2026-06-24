@@ -52,3 +52,10 @@ enabled = true
 command = ["gitleaks", "detect", "--no-banner", "--redact"]
 timeout = 60
 enabled = true
+
+[stages.actionlint]
+command = ["actionlint"]
+timeout = 60
+watch = [".github/workflows/*.yml"]
+enabled = true
+
