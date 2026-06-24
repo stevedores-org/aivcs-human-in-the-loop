@@ -8,6 +8,9 @@ import {
   RefreshCw, Sliders, ArrowUpRight, Play, Pause, Flame,
   Terminal, History, Sparkles, AlertCircle, Check
 } from "lucide-react"
+import { useAuth } from "../lib/auth/AuthProvider"
+import { useRuntimeConfig } from "../lib/config/ConfigProvider"
+import { LoginGate } from "./components/LoginGate"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type NavItem = "dashboard" | "runs" | "visual" | "chaos" | "versioning" | "reviews" | "performance" | "settings" | "docs"
@@ -1318,6 +1321,14 @@ function ApiDocsView() {
 
 // ─── App Container ────────────────────────────────────────────────────────────
 export default function App() {
+  const { config } = useRuntimeConfig()
+  const { isAuthenticated, isLoading, userLabel, user, logout } = useAuth()
+
+  const displayLabel = userLabel ?? "Jane Taylor"
+  const avatarUrl = user?.picture
+  const initials = userLabel
+    ? userLabel.split(/[@.\s]/).filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase()).join("") || "U"
+    : "JT"
   const [activeNav, setActiveNav] = useState<NavItem>("dashboard")
   const [runs] = useState<TestRun[]>(INITIAL_RUNS)
   const [selectedRun, setSelectedRun] = useState<TestRun | null>(INITIAL_RUNS[0])
@@ -1364,6 +1375,21 @@ export default function App() {
     }
   }
 
+  if (isLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-[#030712] text-foreground">
+        <div className="flex flex-col items-center gap-3">
+          <RefreshCw className="w-5 h-5 text-primary animate-spin" />
+          <span className="text-xs text-muted-foreground/50 font-medium tracking-wider">Verifying session...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (config?.requireAuth && !isAuthenticated) {
+    return <LoginGate />
+  }
+
   return (
     <div className="h-screen flex flex-col bg-background text-foreground overflow-hidden" style={{ fontFamily: "Inter,system-ui,sans-serif" }}>
 
@@ -1390,10 +1416,22 @@ export default function App() {
             <Bell className="w-4 h-4" />
             <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-primary" />
           </button>
-          <div className="flex items-center gap-2 text-xs hover:bg-white/[0.03] rounded-lg px-2 h-7.5 transition-all cursor-pointer">
-            <div className="w-5.5 h-5.5 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold" style={{ fontSize: "9px" }}>JT</div>
-            <span className="text-muted-foreground/70 font-medium">Jane Taylor</span>
-            <ChevronDown className="w-3 h-3 text-muted-foreground/40" />
+          <div
+            onClick={logout}
+            title="Sign Out"
+            className="flex items-center gap-2 text-xs hover:bg-white/[0.03] rounded-lg px-2 h-7.5 transition-all cursor-pointer group"
+          >
+            {avatarUrl ? (
+              <img src={avatarUrl} className="w-5.5 h-5.5 rounded-full object-cover border border-primary/30" alt={displayLabel} />
+            ) : (
+              <div className="w-5.5 h-5.5 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold" style={{ fontSize: "9px" }}>
+                {initials}
+              </div>
+            )}
+            <span className="text-muted-foreground/70 font-medium group-hover:text-red-400 transition-colors">
+              {displayLabel}
+            </span>
+            <ChevronDown className="w-3 h-3 text-muted-foreground/40 group-hover:text-red-400 transition-colors" />
           </div>
         </div>
       </header>

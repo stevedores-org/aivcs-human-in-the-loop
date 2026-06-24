@@ -18,6 +18,7 @@ import {
   clearStoredToken,
   decodeJwtPayload,
   getStoredToken,
+  setStoredToken,
 } from "./storage";
 
 type AuthContextValue = {
@@ -26,12 +27,19 @@ type AuthContextValue = {
   isLoading: boolean;
   error: Error | null;
   userLabel: string | null;
+  user: { name?: string; email?: string; picture?: string } | null;
   login: () => Promise<void>;
+  loginMock: (provider: "google" | "github", name: string, email: string) => void;
   logout: () => void;
   handleUnauthorized: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+
+function base64urlEncode(str: string): string {
+  const base64 = btoa(unescape(encodeURIComponent(str)));
+  return base64.replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { config, isLoading: configLoading } = useRuntimeConfig();
@@ -106,6 +114,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await beginOidcLogin(config);
   }, [config]);
 
+  const loginMock = useCallback((provider: "google" | "github", name: string, email: string) => {
+    const header = base64urlEncode(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+    const payloadObj = {
+      sub: `${provider}|${Math.floor(Math.random() * 1000000)}`,
+      name,
+      email,
+      picture: provider === "github" 
+        ? `https://github.com/${email.split("@")[0]}.png` 
+        : `https://api.dicebear.com/7.x/adventurer/svg?seed=${name}`,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 86400,
+    };
+    const payload = base64urlEncode(JSON.stringify(payloadObj));
+    const mockToken = `${header}.${payload}.mockSignature`;
+    
+    setStoredToken(mockToken);
+    setToken(mockToken);
+    setError(null);
+  }, []);
+
+  const user = useMemo(() => {
+    if (!token) return null;
+    const payload = decodeJwtPayload(token);
+    if (!payload) return null;
+    return {
+      name: typeof payload.name === "string" ? payload.name : undefined,
+      email: typeof payload.email === "string" ? payload.email : undefined,
+      picture: typeof payload.picture === "string" ? payload.picture : undefined,
+    };
+  }, [token]);
+
   const userLabel = useMemo(() => {
     if (!token) return null;
     const payload = decodeJwtPayload(token);
@@ -127,7 +166,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading: configLoading || isLoading || waitingForCallback,
     error,
     userLabel,
+    user,
     login,
+    loginMock,
     logout,
     handleUnauthorized,
   };
