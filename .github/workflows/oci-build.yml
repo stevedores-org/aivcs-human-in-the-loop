@@ -152,9 +152,11 @@ jobs:
             TAGS+=("${GITHUB_REF_NAME#v}")
           fi
           printf '%s\n' "${TAGS[@]}" > tags.txt
-          echo "tags<<EOF" >> "$GITHUB_OUTPUT"
-          cat tags.txt >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
+          {
+            echo "tags<<EOF"
+            cat tags.txt
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Push to GAR (dockworker registry)
         env:

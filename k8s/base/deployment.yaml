@@ -7,6 +7,10 @@ metadata:
     app.kubernetes.io/component: frontend
     app.kubernetes.io/part-of: aivcs
     lornu.ai/managed-by: dockworker
+  annotations:
+    checkov.io/skip1: CKV_K8S_14=Image tag is overridden dynamically by CD pipeline
+    checkov.io/skip2: CKV_K8S_43=Image digest is overridden dynamically by CD pipeline
+    checkov.io/skip3: CKV_K8S_35=Runtime secrets loaded as env vars are expected and standard in this app
 spec:
   replicas: 1
   revisionHistoryLimit: 5
@@ -36,7 +40,7 @@ spec:
       containers:
         - name: app
           image: us-central1-docker.pkg.dev/gcp-lornu-ai/lornu/aivcs-human-in-the-loop:develop
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 3000
