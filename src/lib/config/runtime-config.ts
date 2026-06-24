@@ -57,7 +57,7 @@ function configFromHostname(): RuntimeConfig {
     };
   }
 
-  if (host === "preview.aivcs.io" || host === "demo.aivcs.io") {
+  if (host === "preview.aivcs.io" || host === "demo.aivcs.io" || host === "future.aivcs.io") {
     return {
       apiUrl: "https://api-dev.aivcs.io",
       ssoIssuer: "https://auth-dev.aivcs.io",
