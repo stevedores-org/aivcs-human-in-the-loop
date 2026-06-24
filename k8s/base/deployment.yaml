@@ -40,7 +40,7 @@ spec:
       containers:
         - name: app
           image: us-central1-docker.pkg.dev/gcp-lornu-ai/lornu/aivcs-human-in-the-loop:develop
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 3000
