@@ -59,3 +59,14 @@ timeout = 60
 watch = [".github/workflows/*.yml"]
 enabled = true
 
+[stages.checkov]
+command = ["checkov", "-d", "k8s/", "--config-file", ".checkov.yaml", "--quiet"]
+timeout = 60
+watch = ["k8s/**/*.yaml"]
+enabled = true
+
+[stages.kubeconform]
+command = ["bash", "-c", "set -e; for overlay in k8s/overlays/*/; do kustomize build \"$overlay\" | kubeconform -strict -ignore-missing-schemas -summary -; done"]
+timeout = 60
+watch = ["k8s/**/*.yaml"]
+enabled = true
